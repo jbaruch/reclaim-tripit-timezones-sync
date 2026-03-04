@@ -13,5 +13,5 @@ EOF
 
 echo "=== Cron scheduled: daily at 3:00 AM ==="
 
-# Start crond in foreground
-exec crond -f -l 2
+# Start crond in foreground (log level 8 = errors only, avoids leaking env vars in logs)
+exec crond -f -l 8
