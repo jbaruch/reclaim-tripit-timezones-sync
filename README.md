@@ -1,6 +1,6 @@
 # TripIt → Reclaim.ai Travel Timezone Sync
 
-Automatically syncs travel timezones from your TripIt trips to [Reclaim.ai](https://reclaim.ai), so your working hours adjust to wherever you're traveling.
+Automatically syncs travel timezones from your TripIt trips to [Reclaim.ai](https://reclaim.ai), so your scheduling links, habits, and working hours all adjust to wherever you're traveling.
 
 Parses your TripIt iCal feed to extract flight arrival timezones, builds timezone segments for each trip, and pushes them to Reclaim's travel timezone settings via REST API. Runs daily in a Docker container.
 
