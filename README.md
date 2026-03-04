@@ -44,6 +44,8 @@ docker run -d \
 
 The container syncs immediately on startup, then daily at 3:00 AM.
 
+If you're using a NAS or other Docker UI (Portainer, Synology, UGREEN, etc.), the two required environment variables will appear pre-populated in the container creation form — just fill in the values.
+
 ### Build the image
 
 ```bash
@@ -53,7 +55,7 @@ docker build -t tripit-reclaim-sync .
 For a NAS or remote host with a different architecture, build for the target platform:
 
 ```bash
-# For x86_64 NAS (e.g., UGREEN DXP series with Intel CPU)
+# For x86_64 NAS (Intel/AMD)
 docker buildx build --platform linux/amd64 -t tripit-reclaim-sync .
 
 # Export as tar.gz to transfer to the NAS
