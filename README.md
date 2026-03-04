@@ -50,6 +50,22 @@ The container syncs immediately on startup, then daily at 3:00 AM.
 docker build -t tripit-reclaim-sync .
 ```
 
+For a NAS or remote host with a different architecture, build for the target platform:
+
+```bash
+# For x86_64 NAS (e.g., UGREEN DXP series with Intel CPU)
+docker buildx build --platform linux/amd64 -t tripit-reclaim-sync .
+
+# Export as tar.gz to transfer to the NAS
+docker save tripit-reclaim-sync | gzip > tripit-reclaim-sync.tar.gz
+```
+
+On the NAS, load and run:
+
+```bash
+docker load < tripit-reclaim-sync.tar.gz
+```
+
 ## Running locally (without Docker)
 
 ```bash

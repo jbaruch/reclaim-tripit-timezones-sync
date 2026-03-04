@@ -2,3 +2,4 @@
 screenshots/
 node_modules/
 .env
+*.tar.gz
