@@ -2,6 +2,7 @@ import {
   fetchIcalEvents,
   extractTrips,
   extractFlights,
+  extractLodging,
   buildTimezoneSegments,
   filterFutureSegments,
   deduplicateSegments,
@@ -44,10 +45,11 @@ try {
   const events = await fetchIcalEvents(TRIPIT_ICAL_URL);
   const trips = extractTrips(events);
   const flights = extractFlights(events);
+  const stays = extractLodging(events);
 
   // Step 2: Build timezone segments
   console.log('\nBuilding timezone segments...');
-  const allSegments = buildTimezoneSegments(trips, flights);
+  const allSegments = buildTimezoneSegments(trips, flights, stays);
   console.log(`  Built ${allSegments.length} segment(s)`);
 
   // Step 3: Filter and deduplicate

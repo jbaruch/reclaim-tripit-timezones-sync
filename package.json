@@ -5,7 +5,8 @@
   "description": "Sync travel timezones from TripIt iCal feed to Reclaim.ai REST API",
   "scripts": {
     "dry-run": "node sync.mjs dry-run",
-    "sync": "node sync.mjs sync"
+    "sync": "node sync.mjs sync",
+    "test": "node --test lib/*.test.mjs"
   },
   "dependencies": {
     "geo-tz": "^8.1.1",
