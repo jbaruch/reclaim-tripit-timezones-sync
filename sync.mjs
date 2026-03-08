@@ -15,6 +15,23 @@ import {
   createEntry,
 } from './lib/reclaim.mjs';
 
+import { sendNotification, buildSyncSummary } from './lib/notify.mjs';
+
+/**
+ * Compare previous Reclaim entries to new segments.
+ * Returns true if the set of (startDate, endDate, timezone) tuples differs.
+ */
+function entriesChanged(previousEntries, newSegments) {
+  const key = (e) => `${e.startDate}|${e.endDate}|${e.timezone}`;
+  const prev = new Set(previousEntries.map(key));
+  const next = new Set(newSegments.map(key));
+  if (prev.size !== next.size) return true;
+  for (const k of prev) {
+    if (!next.has(k)) return true;
+  }
+  return false;
+}
+
 const mode = process.argv[2] || 'dry-run';
 const VALID_MODES = ['dry-run', 'sync'];
 
@@ -83,22 +100,34 @@ try {
     : current.defaultTimezone || 'unknown';
   console.log(`  Default timezone: ${defTz}`);
 
-  // Clear existing
-  await clearAllEntries(client);
+  // Check if entries actually changed
+  const previousEntries = current.entries || [];
+  const changed = entriesChanged(previousEntries, segments);
 
-  // Create new entries
-  if (segments.length === 0) {
-    console.log('  No segments to sync.');
+  if (!changed) {
+    console.log('  No changes detected — skipping sync and notification.');
   } else {
-    for (const s of segments) {
-      console.log(`  Creating: ${s.timezone} (${s.startDate} → ${s.endDate})`);
-      await createEntry(client, {
-        startDate: s.startDate,
-        endDate: s.endDate,
-        timezone: s.timezone,
-      });
+    // Clear existing
+    await clearAllEntries(client);
+
+    // Create new entries
+    if (segments.length === 0) {
+      console.log('  No segments to sync.');
+    } else {
+      for (const s of segments) {
+        console.log(`  Creating: ${s.timezone} (${s.startDate} → ${s.endDate})`);
+        await createEntry(client, {
+          startDate: s.startDate,
+          endDate: s.endDate,
+          timezone: s.timezone,
+        });
+      }
+      console.log(`  Created ${segments.length} entry/entries`);
     }
-    console.log(`  Created ${segments.length} entry/entries`);
+
+    // Send notification
+    const { subject, message } = buildSyncSummary(previousEntries, segments, defTz);
+    await sendNotification(subject, message);
   }
 
   console.log('\nSync complete!');

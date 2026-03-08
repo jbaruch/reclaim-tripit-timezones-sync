@@ -9,6 +9,7 @@
     "test": "node --test lib/*.test.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-sns": "^3.1004.0",
     "geo-tz": "^8.1.1",
     "node-ical": "^0.20.1"
   }
