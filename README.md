@@ -86,7 +86,9 @@ TRIPIT_ICAL_URL="..." RECLAIM_API_TOKEN="..." node sync.mjs sync
 
 ## Environment variables
 
-| Variable | Description |
-|---|---|
-| `TRIPIT_ICAL_URL` | Your private TripIt iCal feed URL |
-| `RECLAIM_API_TOKEN` | Reclaim.ai API token |
+| Variable | Required | Description |
+|---|---|---|
+| `TRIPIT_ICAL_URL` | Yes | Your private TripIt iCal feed URL |
+| `RECLAIM_API_TOKEN` | Yes | Reclaim.ai API token |
+| `TELEGRAM_BOT_TOKEN` | No | Telegram bot token for change notifications (from [@BotFather](https://t.me/BotFather)) |
+| `TELEGRAM_CHAT_ID` | No | Telegram chat ID to send notifications to |

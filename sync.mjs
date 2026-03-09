@@ -15,6 +15,8 @@ import {
   createEntry,
 } from './lib/reclaim.mjs';
 
+import { entriesChanged, sendNotification } from './lib/notify.mjs';
+
 const mode = process.argv[2] || 'dry-run';
 const VALID_MODES = ['dry-run', 'sync'];
 
@@ -77,11 +79,19 @@ try {
 
   // Show current state
   const current = await listEntries(client);
-  console.log(`  Current entries: ${(current.entries || []).length}`);
+  const previousEntries = current.entries || [];
+  console.log(`  Current entries: ${previousEntries.length}`);
   const defTz = typeof current.defaultTimezone === 'object'
     ? JSON.stringify(current.defaultTimezone)
     : current.defaultTimezone || 'unknown';
   console.log(`  Default timezone: ${defTz}`);
+
+  // Skip sync if nothing changed
+  if (!entriesChanged(previousEntries, segments)) {
+    console.log('  No changes detected — skipping sync.');
+    console.log('\nSync complete!');
+    process.exit(0);
+  }
 
   // Clear existing
   await clearAllEntries(client);
@@ -98,8 +108,11 @@ try {
         timezone: s.timezone,
       });
     }
-    console.log(`  Created ${segments.length} entry/entries`);
+    console.log(`  Created ${segments.length} ${segments.length === 1 ? 'entry' : 'entries'}`);
   }
+
+  // Notify on changes (never throws)
+  await sendNotification(previousEntries, segments);
 
   console.log('\nSync complete!');
 } catch (err) {
