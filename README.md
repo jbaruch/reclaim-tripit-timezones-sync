@@ -2,7 +2,7 @@
 
 Automatically syncs travel timezones from your TripIt trips to [Reclaim.ai](https://reclaim.ai), so your scheduling links, habits, and working hours all adjust to wherever you're traveling.
 
-Parses your TripIt iCal feed to extract timezones from flights and hotel stays, builds timezone segments for each trip, and pushes them to Reclaim's travel timezone settings via REST API. Runs daily in a Docker container. Optionally notifies via Telegram when changes are detected.
+Parses your TripIt iCal feed to extract timezones from flights and hotel stays, builds timezone segments for each trip, and pushes them to Reclaim's travel timezone settings via REST API. Optionally notifies via Telegram when changes are detected.
 
 ## How it works
 
@@ -14,9 +14,9 @@ Parses your TripIt iCal feed to extract timezones from flights and hotel stays, 
 6. Skips sync if nothing changed; otherwise clears existing Reclaim entries and creates new ones
 7. Sends a Telegram notification when timezone overrides change (if configured)
 
-## Setup
+## Prerequisites
 
-### 1. Get your TripIt iCal feed URL
+### Get your TripIt iCal feed URL
 
 1. Go to [tripit.com](https://www.tripit.com) and log in
 2. Navigate to **Settings** (gear icon) → **Calendar Feed**
@@ -26,13 +26,35 @@ Parses your TripIt iCal feed to extract timezones from flights and hotel stays, 
    https://www.tripit.com/feed/ical/private/XXXXXXXX-XXXXXXXXXXXXXXXXXXXX/tripit.ics
    ```
 
-### 2. Get your Reclaim.ai API token
+### Get your Reclaim.ai API token
 
 1. Go to [app.reclaim.ai/settings/developer](https://app.reclaim.ai/settings/developer)
 2. Generate a new API key
 3. Copy the token
 
-### 3. Run with Docker
+## Deployment options
+
+### Run locally
+
+```bash
+npm install
+
+# Dry run — shows what would be synced without making changes
+TRIPIT_ICAL_URL="..." RECLAIM_API_TOKEN="..." node sync.mjs dry-run
+
+# Full sync
+TRIPIT_ICAL_URL="..." RECLAIM_API_TOKEN="..." node sync.mjs sync
+```
+
+### Run with Docker
+
+Build the image:
+
+```bash
+docker build -t tripit-reclaim-sync .
+```
+
+Run the container:
 
 ```bash
 docker run -d \
@@ -45,13 +67,7 @@ docker run -d \
 
 The container syncs immediately on startup, then daily at 3:00 AM.
 
-If you're using a NAS or other Docker UI (Portainer, Synology, UGREEN, etc.), the two required environment variables will appear pre-populated in the container creation form — just fill in the values.
-
-### Build the image
-
-```bash
-docker build -t tripit-reclaim-sync .
-```
+If you're using a NAS or other Docker UI (Portainer, Synology, UGREEN, etc.), the environment variables will appear pre-populated in the container creation form — just fill in the values.
 
 For a NAS or remote host with a different architecture, build for the target platform:
 
@@ -69,21 +85,9 @@ On the NAS, load and run:
 docker load < tripit-reclaim-sync.tar.gz
 ```
 
-### Alternative: Deploy on AWS
+### Deploy on AWS
 
 For a serverless deployment that runs as a scheduled ECS Fargate task (~$0.01/month), see [AWS_DEPLOYMENT.md](AWS_DEPLOYMENT.md).
-
-## Running locally (without Docker)
-
-```bash
-npm install
-
-# Dry run — shows what would be synced without making changes
-TRIPIT_ICAL_URL="..." RECLAIM_API_TOKEN="..." node sync.mjs dry-run
-
-# Full sync
-TRIPIT_ICAL_URL="..." RECLAIM_API_TOKEN="..." node sync.mjs sync
-```
 
 ## Environment variables
 
