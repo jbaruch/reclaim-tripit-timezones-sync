@@ -112,7 +112,7 @@ try {
   }
 
   // Notify on changes (never throws)
-  await sendNotification(previousEntries, segments);
+  await sendNotification(previousEntries, segments, future);
 
   console.log('\nSync complete!');
 } catch (err) {
