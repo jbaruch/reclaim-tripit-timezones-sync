@@ -93,8 +93,8 @@ try {
     process.exit(0);
   }
 
-  // Clear existing
-  await clearAllEntries(client);
+  // Clear existing (pass known entries to avoid redundant API call)
+  await clearAllEntries(client, previousEntries);
 
   // Create new entries
   if (segments.length === 0) {
@@ -102,12 +102,12 @@ try {
   } else {
     for (const s of segments) {
       console.log(`  Creating: ${s.timezone} (${s.startDate} → ${s.endDate})`);
-      await createEntry(client, {
-        startDate: s.startDate,
-        endDate: s.endDate,
-        timezone: s.timezone,
-      });
     }
+    await Promise.all(segments.map(s => createEntry(client, {
+      startDate: s.startDate,
+      endDate: s.endDate,
+      timezone: s.timezone,
+    })));
     console.log(`  Created ${segments.length} ${segments.length === 1 ? 'entry' : 'entries'}`);
   }
 
