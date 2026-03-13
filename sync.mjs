@@ -183,7 +183,7 @@ try {
  * Sync OOO events: create missing, delete stale, set Reclaim priority to P2.
  */
 async function syncOooEvents(reclaimClient, gcal, futureTrips) {
-  const stats = { created: 0, deleted: 0, prioritySet: 0 };
+  const stats = { created: 0, deleted: 0, prioritySet: 0, createdNames: [], deletedNames: [] };
 
   // Get Reclaim primary calendar for the Google Calendar ID and Reclaim calendar ID
   const { calendarId, googleCalendarId } = await getPrimaryCalendar(reclaimClient);
@@ -217,6 +217,7 @@ async function syncOooEvents(reclaimClient, gcal, futureTrips) {
       console.log(`  Deleting stale: ${ev.summary}`);
       await deleteOooEvent(gcal, googleCalendarId, ev.id);
       stats.deleted++;
+      stats.deletedNames.push(name);
       existingByName.delete(name);
     }
   }
@@ -234,6 +235,7 @@ async function syncOooEvents(reclaimClient, gcal, futureTrips) {
     });
     createdEventIds.push(eventId);
     stats.created++;
+    stats.createdNames.push(name);
   }
 
   // Set Reclaim priority to P2 for OOO events
