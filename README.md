@@ -148,6 +148,23 @@ On each sync run (after timezone sync):
 
 The events show up in Google Calendar as proper OOO events with `autoDeclineMode: declineNone` — they mark your calendar as out-of-office without auto-declining meeting invites.
 
+## Ignoring trips (optional)
+
+Some trips in TripIt don't need timezone sync or OOO blocks — family members traveling without you, trips you're tracking for logistics but not attending. Two env vars let you skip them:
+
+- **`TRIPIT_IGNORE_TRIPS`** — comma-separated trip names (case-insensitive substring match)
+- **`TRIPIT_IGNORE_KEYWORDS`** — comma-separated keywords that match against any trip name
+
+```bash
+# Skip a specific trip
+TRIPIT_IGNORE_TRIPS="Family trip to Paris"
+
+# Skip any trip with a family member's name in it
+TRIPIT_IGNORE_KEYWORDS=alice,daniel,nicole
+```
+
+Ignored trips are excluded from both timezone segments and OOO calendar blocks. Their flights and lodging data won't leak into other trips' segments.
+
 ## Telegram notifications (optional)
 
 Get notified when timezone overrides change. To set up:
@@ -169,3 +186,5 @@ When configured, you'll receive a message listing the new timezone overrides whe
 | `GOOGLE_CLIENT_ID` | No | Google OAuth2 client ID (enables OOO blocks) |
 | `GOOGLE_CLIENT_SECRET` | No | Google OAuth2 client secret |
 | `GOOGLE_REFRESH_TOKEN` | No | Google OAuth2 refresh token |
+| `TRIPIT_IGNORE_TRIPS` | No | Comma-separated trip names to ignore (case-insensitive substring match) |
+| `TRIPIT_IGNORE_KEYWORDS` | No | Comma-separated keywords — any trip whose name contains one matches |

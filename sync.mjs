@@ -6,6 +6,7 @@ import {
   buildTimezoneSegments,
   filterFutureSegments,
   filterFutureTrips,
+  filterIgnoredTrips,
   deduplicateSegments,
 } from './lib/tripit.mjs';
 
@@ -56,15 +57,34 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
 
+// Optional: comma-separated trip names to ignore (case-insensitive substring match)
+const IGNORE_TRIPS = (process.env.TRIPIT_IGNORE_TRIPS || '')
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean);
+
+// Optional: comma-separated keywords — any trip whose name contains one of these is ignored
+const IGNORE_KEYWORDS = (process.env.TRIPIT_IGNORE_KEYWORDS || '')
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean);
+
 console.log(`\n=== TripIt → Reclaim Travel Timezone Sync ===`);
 console.log(`Mode: ${mode}\n`);
 
 try {
   // Step 1: Fetch and parse iCal feed
   const events = await fetchIcalEvents(TRIPIT_ICAL_URL);
-  const trips = extractTrips(events);
+  const allTrips = extractTrips(events);
   const flights = extractFlights(events);
   const stays = extractLodging(events);
+
+  // Filter out ignored trips (by exact name or keyword match)
+  const trips = filterIgnoredTrips(allTrips, IGNORE_TRIPS, IGNORE_KEYWORDS);
+  const skipped = allTrips.length - trips.length;
+  if (skipped > 0) {
+    console.log(`  Ignored ${skipped} trip(s) matching TRIPIT_IGNORE_TRIPS/KEYWORDS`);
+  }
 
   // Step 2: Build timezone segments
   console.log('\nBuilding timezone segments...');
