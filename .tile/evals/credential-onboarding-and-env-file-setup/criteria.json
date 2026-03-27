@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent correctly handles credential onboarding: reading from a non-standard input path, writing to the correct destination, filtering notification variables, detecting incomplete Google OAuth credentials, and validating via dry-run.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Reads from input path",
+      "max_score": 8,
+      "description": "Agent reads credentials from /tmp/tripit-creds.txt (the provided location, not /opt/tripit-reclaim/.env)"
+    },
+    {
+      "name": "Writes to correct env file path",
+      "max_score": 10,
+      "description": "Filtered credentials are written to /opt/tripit-reclaim/.env"
+    },
+    {
+      "name": "File permissions set to 600",
+      "max_score": 10,
+      "description": "chmod 600 is applied to the written env file"
+    },
+    {
+      "name": "Telegram vars excluded",
+      "max_score": 10,
+      "description": "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are NOT written to the output env file"
+    },
+    {
+      "name": "SNS var excluded",
+      "max_score": 10,
+      "description": "SNS_TOPIC_ARN is NOT written to the output env file"
+    },
+    {
+      "name": "Mandatory vars included",
+      "max_score": 10,
+      "description": "Both TRIPIT_ICAL_URL and RECLAIM_API_TOKEN are present in the written env file"
+    },
+    {
+      "name": "Trip filtering var included",
+      "max_score": 8,
+      "description": "TRIPIT_IGNORE_TRIPS is preserved in the written env file (it's a valid optional variable)"
+    },
+    {
+      "name": "Incomplete Google OAuth detected",
+      "max_score": 14,
+      "description": "Agent warns that OOO blocks won't work because GOOGLE_REFRESH_TOKEN is missing — without the task having spelled out which credential is missing"
+    },
+    {
+      "name": "Dry-run attempted",
+      "max_score": 10,
+      "description": "Agent runs or attempts to run the dry-run command (node sync.mjs dry-run --output=json) to validate the setup"
+    },
+    {
+      "name": "Dry-run failure handled",
+      "max_score": 10,
+      "description": "Agent acknowledges the dry-run failed (fake credentials) and explains that real credentials are needed to fully validate, rather than silently ignoring the failure"
+    }
+  ]
+}

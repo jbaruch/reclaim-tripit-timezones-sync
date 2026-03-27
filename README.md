@@ -44,7 +44,32 @@ TRIPIT_ICAL_URL="..." RECLAIM_API_TOKEN="..." node sync.mjs dry-run
 
 # Full sync
 TRIPIT_ICAL_URL="..." RECLAIM_API_TOKEN="..." node sync.mjs sync
+
+# JSON output (for scripts, agents, or automation)
+TRIPIT_ICAL_URL="..." RECLAIM_API_TOKEN="..." node sync.mjs sync --output=json
 ```
+
+The `--output=json` flag works with both `dry-run` and `sync` modes. When set, the script outputs a single JSON object to stdout instead of human-readable text:
+
+```json
+{
+  "mode": "sync",
+  "noChanges": false,
+  "timezoneChanges": [
+    { "action": "create", "timezone": "America/Chicago", "from": "2026-04-01", "to": "2026-04-05" }
+  ],
+  "segments": [
+    { "timezone": "America/Chicago", "from": "2026-04-01", "to": "2026-04-05", "label": "KubeCon - Austin" }
+  ],
+  "ooo": { "created": 2, "deleted": 1, "setToP2": 1 },
+  "conflicts": [
+    { "trip1": "KubeCon", "trip2": "DevOps Days", "overlap": "2026-04-03" }
+  ],
+  "errors": []
+}
+```
+
+Human-readable output remains the default.
 
 ### Run with Docker
 
@@ -88,6 +113,20 @@ docker load < tripit-reclaim-sync.tar.gz
 ### Deploy on AWS
 
 For a serverless deployment that runs as a scheduled ECS Fargate task (~$0.01/month), see [AWS_DEPLOYMENT.md](AWS_DEPLOYMENT.md).
+
+### Run as an AI agent tile
+
+Install the [Tessl](https://tessl.io) tile to let any AI agent run the sync on your behalf:
+
+```bash
+tessl install jbaruch/reclaim-tripit-sync
+```
+
+The tile provides two skills:
+- **`sync-tripit`** — runs the sync with `--output=json`, interprets the result, and reports changes (or stays silent if nothing changed)
+- **`onboard-tripit-reclaim`** — guided credential setup with dry-run validation
+
+The agent downloads and installs the sync tool on first use — no pre-configuration needed beyond setting your environment variables. Telegram and SNS notification variables are not needed when running as a tile; the agent handles reporting.
 
 ## OOO calendar blocks (optional)
 

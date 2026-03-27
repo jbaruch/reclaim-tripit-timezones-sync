@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent correctly implements the sync library installation check, uses the exact prescribed download URL and install path, runs the sync with the required output flag, and captures both stdout and exit code as specified in the skill.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Existence check before install",
+      "max_score": 10,
+      "description": "Script checks whether /opt/tripit-reclaim/sync.mjs exists before attempting installation"
+    },
+    {
+      "name": "Correct download URL",
+      "max_score": 12,
+      "description": "Installation uses the exact GitHub tarball URL: https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/heads/main.tar.gz"
+    },
+    {
+      "name": "Correct install path",
+      "max_score": 10,
+      "description": "Downloaded archive is extracted/moved to /opt/tripit-reclaim (not any other path)"
+    },
+    {
+      "name": "npm ci with --omit=dev",
+      "max_score": 10,
+      "description": "Dependencies are installed using `npm ci --omit=dev` (not `npm install` or `npm ci` without --omit=dev)"
+    },
+    {
+      "name": "Post-install verification",
+      "max_score": 10,
+      "description": "After the download and npm ci steps complete, the script verifies sync.mjs exists before proceeding to run it (a separate check from the initial existence check — this catches download/extract failures)"
+    },
+    {
+      "name": "Install failure aborts",
+      "max_score": 10,
+      "description": "Script exits with non-zero code if sync.mjs does not exist after install attempt (does not silently continue to the sync step)"
+    },
+    {
+      "name": "Correct sync command",
+      "max_score": 12,
+      "description": "Sync is run as `node /opt/tripit-reclaim/sync.mjs sync --output=json` (sync subcommand, not dry-run, with --output=json flag)"
+    },
+    {
+      "name": "JSON output captured to file",
+      "max_score": 10,
+      "description": "Script captures stdout from the sync command and writes it to sync-output.json"
+    },
+    {
+      "name": "Exit code propagation",
+      "max_score": 8,
+      "description": "Script captures the sync command's exit code and uses it to determine its own exit code"
+    },
+    {
+      "name": "Non-zero exit on sync failure",
+      "max_score": 8,
+      "description": "Script exits with non-zero code when the sync command fails (exit code 1)"
+    }
+  ]
+}

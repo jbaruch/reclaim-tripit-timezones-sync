@@ -1,0 +1,18 @@
+{
+  "name": "jbaruch/reclaim-tripit-sync",
+  "version": "0.1.0",
+  "summary": "Syncs TripIt travel itineraries to Reclaim.ai timezone segments and Google Calendar OOO blocks.",
+  "rules": {
+    "tripit-reclaim": {
+      "rules": "rules/tripit-reclaim.md"
+    }
+  },
+  "skills": {
+    "sync-tripit": {
+      "path": "skills/sync-tripit/SKILL.md"
+    },
+    "onboard-tripit-reclaim": {
+      "path": "skills/onboard/SKILL.md"
+    }
+  }
+}

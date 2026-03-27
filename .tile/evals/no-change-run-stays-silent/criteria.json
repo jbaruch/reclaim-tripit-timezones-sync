@@ -1,0 +1,56 @@
+{
+  "context": "Tests the critical 'stay silent on no-change runs' behavior. Both JSON inputs have noChanges: true, empty conflicts, and empty errors. The correct behavior is to NOT generate a notification. This also tests whether the agent is tempted to report on the segments that exist (which are not changes) or to fabricate differences between the two runs.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Run 1 identified as no-change",
+      "max_score": 10,
+      "description": "Agent correctly identifies run-1-output.json as a no-change run (noChanges is true, no errors, no conflicts)"
+    },
+    {
+      "name": "Run 2 identified as no-change",
+      "max_score": 10,
+      "description": "Agent correctly identifies run-2-output.json as a no-change run (noChanges is true, no errors, no conflicts)"
+    },
+    {
+      "name": "Decision is silence",
+      "max_score": 16,
+      "description": "notification-decision.md states that no notification should be sent for either run"
+    },
+    {
+      "name": "Does not report existing segments as changes",
+      "max_score": 14,
+      "description": "Agent does NOT treat the segments array as 'changes' — segments are the current state, not new activity. Does not say 'KubeCon timezone was created' or similar"
+    },
+    {
+      "name": "Does not fabricate diff between runs",
+      "max_score": 14,
+      "description": "Agent does NOT claim that the difference in segment count between run 1 (2 segments) and run 2 (1 segment) represents a change — both runs independently report noChanges: true"
+    },
+    {
+      "name": "Does not report null OOO as a problem",
+      "max_score": 10,
+      "description": "Agent does NOT flag run 2's null OOO field as an error or issue — null means OOO was not configured, which is a valid state"
+    },
+    {
+      "name": "Reasoning is provided",
+      "max_score": 8,
+      "description": "Agent explains WHY silence is correct (e.g., references noChanges being true, empty errors/conflicts) rather than just saying 'nothing to report'"
+    },
+    {
+      "name": "Does not run the sync",
+      "max_score": 8,
+      "description": "Agent does NOT attempt to run sync.mjs or make API calls — the task is to interpret provided output, not to re-run the sync"
+    },
+    {
+      "name": "Both runs processed",
+      "max_score": 5,
+      "description": "Agent processes both JSON files, not just one"
+    },
+    {
+      "name": "Concise output",
+      "max_score": 5,
+      "description": "notification-decision.md is brief and to the point — a few sentences, not a multi-page analysis of nothing"
+    }
+  ]
+}

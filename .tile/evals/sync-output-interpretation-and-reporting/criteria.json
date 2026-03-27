@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent correctly interprets a sync JSON output that contains changes, conflicts, AND errors simultaneously — without being told what structure to use for the report.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Report is not empty",
+      "max_score": 8,
+      "description": "sync-report.md is produced and contains a substantive report (noChanges is false, there are conflicts and errors — silence would be wrong)"
+    },
+    {
+      "name": "Created timezones reported with context",
+      "max_score": 10,
+      "description": "Report mentions both new timezone segments (America/Chicago and Europe/Berlin) with their dates or trip labels"
+    },
+    {
+      "name": "Deleted timezone reported separately",
+      "max_score": 12,
+      "description": "Report clearly distinguishes the deleted Asia/Singapore segment from the created ones — not listed as just another change"
+    },
+    {
+      "name": "OOO block counts reported",
+      "max_score": 8,
+      "description": "Report mentions OOO block activity (2 created, 1 deleted)"
+    },
+    {
+      "name": "Conflict warning with both trip names",
+      "max_score": 12,
+      "description": "Report warns about the overlap and names both trips: Open Source Summit and PlatformCon"
+    },
+    {
+      "name": "Conflict date included",
+      "max_score": 8,
+      "description": "Report includes the overlap date 2026-04-24 in the conflict warning"
+    },
+    {
+      "name": "Error reported",
+      "max_score": 14,
+      "description": "Report includes the error about failing to set priority for PlatformCon — does not silently drop it because the errors array is non-empty"
+    },
+    {
+      "name": "Error contextualized",
+      "max_score": 10,
+      "description": "Report connects the error (PlatformCon priority failure) to the conflict (PlatformCon overlaps with Open Source Summit) or at least presents them in a way that makes the relationship apparent"
+    },
+    {
+      "name": "Uses trip labels from segments",
+      "max_score": 8,
+      "description": "Report uses human-readable trip labels (e.g., 'KubeCon - Austin') from the segments array rather than only raw timezone names"
+    },
+    {
+      "name": "No fabricated data",
+      "max_score": 10,
+      "description": "Report does not invent details not present in the JSON (no made-up trip names, dates, or counts beyond what the data contains)"
+    }
+  ]
+}
