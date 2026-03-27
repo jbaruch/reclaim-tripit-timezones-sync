@@ -1,11 +1,11 @@
 {
-  "context": "Tests whether the agent correctly implements the sync library installation check, uses the exact prescribed download URL and install path, runs the sync with the required output flag, and captures both stdout and exit code as specified in the skill.",
+  "context": "Tests whether the agent correctly implements the sync library installation check, uses the exact prescribed download URL and user-space install path, runs the sync with the required output flag, and captures both stdout and exit code as specified in the skill.",
   "type": "weighted_checklist",
   "checklist": [
     {
       "name": "Existence check before install",
       "max_score": 10,
-      "description": "Script checks whether /opt/tripit-reclaim/sync.mjs exists before attempting installation"
+      "description": "Script checks whether $HOME/.tripit-reclaim/sync.mjs exists before attempting installation"
     },
     {
       "name": "Correct download URL",
@@ -13,9 +13,9 @@
       "description": "Installation uses the exact GitHub tarball URL: https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/heads/main.tar.gz"
     },
     {
-      "name": "Correct install path",
+      "name": "User-space install path",
       "max_score": 10,
-      "description": "Downloaded archive is extracted/moved to /opt/tripit-reclaim (not any other path)"
+      "description": "Downloaded archive is extracted to $HOME/.tripit-reclaim (user-space, not /opt/ or other system paths)"
     },
     {
       "name": "npm ci with --omit=dev",
@@ -35,7 +35,7 @@
     {
       "name": "Correct sync command",
       "max_score": 12,
-      "description": "Sync is run as `node /opt/tripit-reclaim/sync.mjs sync --output=json` (sync subcommand, not dry-run, with --output=json flag)"
+      "description": "Sync is run with sync subcommand and --output=json flag (not dry-run)"
     },
     {
       "name": "JSON output captured to file",

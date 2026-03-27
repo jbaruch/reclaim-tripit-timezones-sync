@@ -1,16 +1,16 @@
 {
-  "context": "Tests whether the agent correctly handles credential onboarding: reading from a non-standard input path, writing to the correct destination, filtering notification variables, detecting incomplete Google OAuth credentials, and validating via dry-run.",
+  "context": "Tests whether the agent correctly handles credential onboarding: reading from a non-standard input path, writing to the correct destination using file-level filtering (not reproducing values), filtering notification variables, detecting incomplete Google OAuth credentials, and validating via dry-run.",
   "type": "weighted_checklist",
   "checklist": [
     {
       "name": "Reads from input path",
       "max_score": 8,
-      "description": "Agent reads credentials from /tmp/tripit-creds.txt (the provided location, not /opt/tripit-reclaim/.env)"
+      "description": "Agent reads credentials from /tmp/tripit-creds.txt (the provided location)"
     },
     {
       "name": "Writes to correct env file path",
       "max_score": 10,
-      "description": "Filtered credentials are written to /opt/tripit-reclaim/.env"
+      "description": "Filtered credentials are written to $HOME/.tripit-reclaim/.env (user-space, not /opt/)"
     },
     {
       "name": "File permissions set to 600",
