@@ -30,25 +30,55 @@ import {
 
 import { entriesChanged, sendNotification, findOverlaps } from './lib/notify.mjs';
 
-const mode = process.argv[2] || 'dry-run';
+// Parse CLI arguments: mode (positional) and --output=json (flag)
+const args = process.argv.slice(2);
+const outputIdx = args.findIndex(a => a.startsWith('--output='));
+const outputFormat = outputIdx >= 0 ? args.splice(outputIdx, 1)[0].split('=')[1] : 'text';
+if (outputFormat !== 'text' && outputFormat !== 'json') {
+  console.error(`Unknown output format: ${outputFormat}`);
+  console.error('Supported: --output=text (default), --output=json');
+  process.exit(1);
+}
+const jsonOutput = outputFormat === 'json';
+
+const mode = args[0] || 'dry-run';
 const VALID_MODES = ['dry-run', 'sync'];
 
 if (!VALID_MODES.includes(mode)) {
   console.error(`Unknown mode: ${mode}`);
-  console.error(`Usage: node sync.mjs [${VALID_MODES.join('|')}]`);
+  console.error(`Usage: node sync.mjs [${VALID_MODES.join('|')}] [--output=json]`);
   process.exit(1);
 }
+
+// In JSON mode, suppress human-readable output and collect structured data instead
+const _log = console.log;
+const _error = console.error;
+if (jsonOutput) {
+  console.log = () => {};
+}
+
+const result = {
+  mode,
+  noChanges: true,
+  timezoneChanges: [],
+  segments: [],
+  ooo: null,
+  conflicts: [],
+  errors: [],
+};
 
 const TRIPIT_ICAL_URL = process.env.TRIPIT_ICAL_URL;
 const RECLAIM_API_TOKEN = process.env.RECLAIM_API_TOKEN;
 
 if (!TRIPIT_ICAL_URL) {
-  console.error('Missing TRIPIT_ICAL_URL environment variable');
+  if (jsonOutput) { result.errors.push('Missing TRIPIT_ICAL_URL environment variable'); _log(JSON.stringify(result)); }
+  _error('Missing TRIPIT_ICAL_URL environment variable');
   process.exit(1);
 }
 
 if (!RECLAIM_API_TOKEN) {
-  console.error('Missing RECLAIM_API_TOKEN environment variable');
+  if (jsonOutput) { result.errors.push('Missing RECLAIM_API_TOKEN environment variable'); _log(JSON.stringify(result)); }
+  _error('Missing RECLAIM_API_TOKEN environment variable');
   process.exit(1);
 }
 
@@ -104,6 +134,7 @@ try {
     console.log(`\n⚠️  OVERLAPPING TRIPS:`);
     for (const o of overlaps) {
       console.log(`  ${o.labelA} (→ ${o.endA}) overlaps ${o.labelB} (${o.startB} →)`);
+      result.conflicts.push({ trip1: o.labelA, trip2: o.labelB, overlap: o.startB });
     }
   }
 
@@ -113,6 +144,14 @@ try {
     console.log(`  ${s.label}`);
     console.log(`    ${s.startDate} → ${s.endDate}  [${s.timezone}]`);
   }
+
+  // Populate result segments
+  result.segments = segments.map(s => ({
+    timezone: s.timezone,
+    from: s.startDate,
+    to: s.endDate,
+    label: s.label,
+  }));
 
   // Get future trips for OOO sync
   const futureTrips = filterFutureTrips(trips);
@@ -129,6 +168,7 @@ try {
       console.log('\n  OOO blocks: skipped (Google Calendar credentials not configured)');
     }
 
+    if (jsonOutput) _log(JSON.stringify(result));
     process.exit(0);
   }
 
@@ -152,9 +192,15 @@ try {
     console.log('  No timezone changes detected — skipping timezone sync.');
   } else {
     timezoneChanged = true;
+    result.noChanges = false;
 
     // Clear existing (pass known entries to avoid redundant API call)
     await clearAllEntries(client, previousEntries);
+    for (const e of previousEntries) {
+      result.timezoneChanges.push({
+        action: 'delete', timezone: e.timezone, from: e.startDate, to: e.endDate,
+      });
+    }
 
     // Create new entries
     if (segments.length === 0) {
@@ -162,6 +208,9 @@ try {
     } else {
       for (const s of segments) {
         console.log(`  Creating: ${s.timezone} (${s.startDate} → ${s.endDate})`);
+        result.timezoneChanges.push({
+          action: 'create', timezone: s.timezone, from: s.startDate, to: s.endDate,
+        });
       }
       await Promise.all(segments.map(s => createEntry(client, {
         startDate: s.startDate,
@@ -185,6 +234,14 @@ try {
   } else {
     console.log('\n── OOO Calendar Blocks ──');
     oooStats = await syncOooEvents(client, gcal, futureTrips);
+    result.ooo = {
+      created: oooStats.created,
+      deleted: oooStats.deleted,
+      setToP2: oooStats.prioritySet,
+    };
+    if (oooStats.created > 0 || oooStats.deleted > 0) {
+      result.noChanges = false;
+    }
   }
 
   // Notify on changes (never throws)
@@ -193,9 +250,14 @@ try {
   }
 
   console.log('\nSync complete!');
+  if (jsonOutput) _log(JSON.stringify(result));
 } catch (err) {
-  console.error(`\nFATAL ERROR: ${err.message}`);
-  console.error(err.stack);
+  if (jsonOutput) {
+    result.errors.push(err.message);
+    _log(JSON.stringify(result));
+  }
+  _error(`\nFATAL ERROR: ${err.message}`);
+  _error(err.stack);
   process.exit(1);
 }
 
