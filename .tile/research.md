@@ -79,75 +79,46 @@ The skill checks for the library and downloads it on first use — no pre-baking
 
 ```bash
 if [ ! -f /opt/tripit-reclaim/sync.mjs ]; then
-  curl -sL https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/heads/main.tar.gz \
-    | tar xz -C /opt/
-  mv /opt/reclaim-tripit-timezones-sync-main /opt/tripit-reclaim
+  mkdir -p /opt/tripit-reclaim
+  curl -sL https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.2.0.tar.gz \
+    | tar xz --strip-components=1 -C /opt/tripit-reclaim
   cd /opt/tripit-reclaim && npm ci --omit=dev
 fi
-node /opt/tripit-reclaim/sync.mjs sync
+node /opt/tripit-reclaim/sync.mjs sync --output=json
 ```
 
 ### `sync-tripit` skill — architecture
 
 **Step 1: Run the script (deterministic)**
 - Check if `/opt/tripit-reclaim/sync.mjs` exists; if not, download + install (see above)
-- Run `node /opt/tripit-reclaim/sync.mjs sync`, capture stdout/stderr
+- Run `node /opt/tripit-reclaim/sync.mjs sync --output=json`, capture stdout/stderr
 
 **Step 2: Process output (AI-assisted)**
 
-The script output is **human-readable text, not JSON**. The skill must parse it by reading the text. Key signals to detect:
+The script outputs **a single JSON object** on stdout when `--output=json` is set (the default text mode is reserved for human eyes). The skill parses the JSON and decides what to surface. Key fields to inspect:
 
-**No-changes run** — look for this line in stdout:
-```
-No timezone changes detected — skipping timezone sync.
-```
-If this appears AND no OOO changes (`0 created, 0 deleted, 0 set to P2`) → silent, send nothing.
+**No-changes run** — `noChanges: true` and either `ooo` is `null` (Google Calendar not configured, or dry-run) or all of `ooo.created`/`ooo.deleted`/`ooo.setToP2` are 0. Stay silent, send nothing.
 
-**Changes detected** — look for lines like:
-```
-Creating: America/Chicago (2026-04-01 → 2026-04-05)
-Created 2 entries
-OOO sync: 1 created, 0 deleted, 1 set to P2
-```
+**Changes detected** — `noChanges: false`. The JSON carries:
+- `timezoneChanges[]` — array of `{action: 'create'|'delete', timezone, from, to}` entries.
+- `segments[]` — full deduplicated post-sync segment list (`{timezone, from, to, label}`), useful for showing the resulting timeline.
+- `ooo` — `{created, deleted, setToP2}` counts when Google Calendar is configured; `null` otherwise.
+- `conflicts[]` — overlap warnings as `{trip1, trip2, overlap}` for any cross-trip date conflict.
+- `errors[]` — populated only on fatal failure (missing env var or thrown exception). On fatal failure the script still prints the JSON to stdout (with `errors[]` populated), then writes `FATAL ERROR: <message>` to stderr, then exits non-zero. Consumers should always parse the JSON first; check `errors[]` to detect failure rather than relying on stderr.
+
 Summarize what changed: new timezone segments, OOO blocks created/deleted, P2 priorities set.
 
-**Timezone segments summary** — always printed, between the `── Timezone segments ──` and next `──` header:
-```
-  Trip name
-    2026-04-01 → 2026-04-05  [America/Chicago]
-```
+**Overlapping trips** — `conflicts[]` is non-empty. Each entry names both trips and the overlap boundary date. Flag these as a warning in the output — they produce potentially conflicting timezone segments.
 
-**Overlapping trips** — printed to stdout before the segments summary if overlaps exist:
-```
-⚠️  OVERLAPPING TRIPS:
-  Trip A (→ 2026-04-05) overlaps Trip B (2026-04-03 →)
-```
-Each line names both trips and the overlapping date boundary. Flag these as a warning in the output — they produce potentially conflicting timezone segments.
+**Errors** — `errors[]` non-empty signals fatal failure. The script emits the JSON to stdout first (with `errors[]` populated), then prints `FATAL ERROR: <message>` to stderr, then exits non-zero. Missing env vars (`Missing TRIPIT_ICAL_URL environment variable`) follow the same pattern.
 
-**Errors** — go to stderr, fatal errors look like:
-```
-FATAL ERROR: <message>
-<stack trace>
-```
-Also on stderr: missing env vars (`Missing TRIPIT_ICAL_URL environment variable`). Exit code is 1 on any fatal error.
-
-**Dry-run mode** ends with:
-```
-Dry run complete. No changes made to Reclaim.
-```
-Useful for onboarding/credential verification.
-
-**OOO retry warning** (non-fatal, on stdout):
-```
-  N new event(s) not yet in Reclaim — retrying priority in Xs...
-```
-This is informational; the script handles the retry itself.
+**Dry-run mode** sets `mode: 'dry-run'` in the JSON. No `timezoneChanges` or `ooo` activity is reported because nothing was written. Useful for onboarding/credential verification.
 
 Apply filtering logic:
-- No changes detected → silent (send nothing)
-- Changes detected → summarize what changed (new timezones, removed segments, OOO blocks created)
-- Overlapping trips detected → flag with warning; include trip names and conflicting dates
-- Errors (stderr / exit code 1) → report with context
+- `noChanges: true` and OOO counts all zero → silent (send nothing)
+- Changes detected → summarize what changed (`timezoneChanges`, `ooo`)
+- `conflicts[]` non-empty → flag with warning; include trip names and conflicting dates
+- `errors[]` non-empty / non-zero exit → report with context
 
 **The skill is channel-agnostic** — it produces output, the calling agent decides how to present it.
 

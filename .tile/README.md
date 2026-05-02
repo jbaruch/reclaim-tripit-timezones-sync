@@ -227,3 +227,29 @@ When configured, you'll receive a message listing the new timezone overrides whe
 | `GOOGLE_REFRESH_TOKEN` | No | Google OAuth2 refresh token |
 | `TRIPIT_IGNORE_TRIPS` | No | Comma-separated trip names to ignore (case-insensitive substring match) |
 | `TRIPIT_IGNORE_KEYWORDS` | No | Comma-separated keywords — any trip whose name contains one matches |
+
+## Releasing a new version
+
+The tile is versioned (see `.tile/CHANGELOG.md`). The agent install URL in
+`skills/sync-tripit/SKILL.md` points at a tagged tarball, so installs pull
+the exact version the tile expects rather than whatever happens to be on
+`main`.
+
+To cut a release:
+
+```bash
+# 1. Bump version + propagate to SKILL.md, eval criteria, research.md
+.tile/scripts/bump-version.sh 0.3.0
+
+# 2. Add an entry to .tile/CHANGELOG.md, commit, open a PR, merge
+
+# 3. Tag the merge commit on main
+git checkout main && git pull --ff-only
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+The tag is what the install URL resolves to — pushing it makes the new
+version installable. Any agent tile that has already been installed from
+an earlier tag continues to work; only fresh installs pick up the new
+version.
