@@ -245,7 +245,7 @@ touches `.tile/**`. It uses [`tesslio/patch-version-publish`][gha] to:
 3. Otherwise → auto-bump the patch number, publish, and commit the
    bumped `tile.json` back to `main` with `[skip ci]`
 
-The workflow also creates+pushes the matching `vX.Y.Z` git tag so
+The workflow also creates and pushes the matching `vX.Y.Z` git tag so
 the in-skill `curl ... archive/refs/tags/vX.Y.Z.tar.gz` URL always
 resolves. It pre-tags the user-bumped version BEFORE publish (so
 fresh installs of a deliberate minor/major release don't race), and
