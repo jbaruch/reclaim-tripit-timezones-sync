@@ -79,7 +79,7 @@ The skill checks for the library and downloads it on first use — no pre-baking
 
 ```bash
 if [ ! -f /opt/tripit-reclaim/sync.mjs ]; then
-  curl -sL https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/heads/main.tar.gz \
+  curl -sL https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.2.0.tar.gz \
     | tar xz -C /opt/
   mv /opt/reclaim-tripit-timezones-sync-main /opt/tripit-reclaim
   cd /opt/tripit-reclaim && npm ci --omit=dev
