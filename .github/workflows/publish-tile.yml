@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - '.tile/**'
-      - '.github/workflows/publish-tile.yml'
 
 # Serialize publishes on main: a closely-following push could otherwise race
 # (both runs querying the same registry version, both bumping to the same
@@ -32,11 +31,14 @@ jobs:
         # that tag BEFORE the registry publish so consumers who fresh-install
         # the new tile don't 404 on the install URL while we wait for a
         # post-publish tag step.
+        #
+        # Use ls-remote to check tag existence on origin directly — it
+        # doesn't depend on whether the local checkout fetched tags.
         run: |
           LOCAL_VERSION=$(jq -r '.version' .tile/tile.json)
           TAG="v${LOCAL_VERSION}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, no pre-tag needed"
+          if [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
+            echo "Tag $TAG already exists on origin, no pre-tag needed"
           else
             git tag "$TAG"
             git push origin "$TAG"
@@ -64,10 +66,9 @@ jobs:
         run: |
           PUBLISHED="${{ steps.publish.outputs.version }}"
           TAG="v${PUBLISHED}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, skipping"
+          if [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
+            echo "Tag $TAG already exists on origin, skipping"
           else
-            git fetch --tags --quiet
             git tag "$TAG" HEAD
             git push origin "$TAG"
             echo "Created tag $TAG at the action's post-bump commit"
