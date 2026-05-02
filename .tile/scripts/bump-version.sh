@@ -69,3 +69,8 @@ echo "     It pushes the v$NEW tag (so the in-skill curl URL resolves),"
 echo "     publishes the tile to the Tessl registry, and tags any auto-"
 echo "     bumped patch version. No manual 'git tag' or 'tessl tile publish'"
 echo "     is needed."
+echo
+echo "     The publish step requires a TESSL_TOKEN repo secret with"
+echo "     publisher role under Settings → Secrets and variables →"
+echo "     Actions. Without it, the workflow run fails at the publish"
+echo "     step (the pre-tag step still succeeds)."
