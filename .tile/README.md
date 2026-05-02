@@ -245,7 +245,14 @@ touches `.tile/**`. It uses [`tesslio/patch-version-publish`][gha] to:
 3. Otherwise → auto-bump the patch number, publish, and commit the
    bumped `tile.json` back to `main` with `[skip ci]`
 
-[gha]: https://github.com/tesslio/tessl-smart-publish
+The workflow also creates+pushes the matching `vX.Y.Z` git tag so
+the in-skill `curl ... archive/refs/tags/vX.Y.Z.tar.gz` URL always
+resolves. It pre-tags the user-bumped version BEFORE publish (so
+fresh installs of a deliberate minor/major release don't race), and
+post-tags any action-bumped patch version too. Subsequent pushes that
+don't change the version are no-ops on the tagging side.
+
+[gha]: https://github.com/tesslio/patch-version-publish
 
 The workflow needs a `TESSL_TOKEN` repo secret. Create one with
 `tessl api-key create --workspace <ws> --name "ci-publish" --role publisher`
@@ -262,14 +269,11 @@ which warranted `0.1.0 → 0.2.0`):
 .tile/scripts/bump-version.sh 0.3.0
 
 # 2. Add an entry to .tile/CHANGELOG.md, commit, open a PR, merge
-
-# 3. Tag the merge commit on main so the in-skill curl URL resolves
-git checkout main && git pull --ff-only
-git tag v0.3.0
-git push origin v0.3.0
 ```
 
-The publish-tile workflow takes over from there.
+The publish-tile workflow takes over from there: it pushes the
+`v0.3.0` tag at the merge commit, publishes the tile to the registry,
+and tags any auto-bumped patch version too. No manual tagging needed.
 
 ### Two distribution channels
 

@@ -7,16 +7,68 @@ on:
       - '.tile/**'
       - '.github/workflows/publish-tile.yml'
 
+# Serialize publishes on main: a closely-following push could otherwise race
+# (both runs querying the same registry version, both bumping to the same
+# patch). Queue subsequent runs instead of cancelling so no version is lost.
+concurrency:
+  group: publish-tile-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: tesslio/patch-version-publish@v1
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pre-tag the user-bumped tile.json version
+        # If the PR bumped tile.json (e.g., 0.2.0 → 0.3.0 via bump-version.sh),
+        # the in-skill curl URL inside the bundle now references vX.Y.Z. Push
+        # that tag BEFORE the registry publish so consumers who fresh-install
+        # the new tile don't 404 on the install URL while we wait for a
+        # post-publish tag step.
+        run: |
+          LOCAL_VERSION=$(jq -r '.version' .tile/tile.json)
+          TAG="v${LOCAL_VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, no pre-tag needed"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "Created tag $TAG at the merge commit"
+          fi
+
+      - name: Publish tile to Tessl registry
+        # Pinned to a commit SHA (corresponds to the v1 tag at the time of
+        # adoption) for supply-chain immutability. Bump the SHA explicitly
+        # when upgrading the action.
+        uses: tesslio/patch-version-publish@088d998ba027eb8f646397e83fcd263cd336f139
+        id: publish
         with:
           token: ${{ secrets.TESSL_TOKEN }}
           path: .tile
+
+      - name: Tag the auto-bumped version
+        # If the action auto-bumped the patch number (routine push without a
+        # manual tile.json change), the published version is in
+        # steps.publish.outputs.version and won't match the pre-tagged
+        # version above. Create that tag too so the registry version's
+        # auditable git ref exists, even though SKILL.md inside still
+        # references the prior tag (auto-patches don't change library URLs).
+        if: steps.publish.outputs.version != ''
+        run: |
+          PUBLISHED="${{ steps.publish.outputs.version }}"
+          TAG="v${PUBLISHED}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+          else
+            git fetch --tags --quiet
+            git tag "$TAG" HEAD
+            git push origin "$TAG"
+            echo "Created tag $TAG at the action's post-bump commit"
+          fi
