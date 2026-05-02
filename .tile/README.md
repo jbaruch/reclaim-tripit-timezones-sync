@@ -244,7 +244,7 @@ To cut a release:
 # 2. Add an entry to .tile/CHANGELOG.md, commit, open a PR, merge
 
 # 3. Tag the merge commit on main
-git checkout main && git pull
+git checkout main && git pull --ff-only
 git tag v0.3.0
 git push origin v0.3.0
 ```

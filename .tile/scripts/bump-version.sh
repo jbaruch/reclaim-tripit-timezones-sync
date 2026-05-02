@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Bump the tile's version and propagate to SKILL.md, eval criteria, and
-# research.md so installs pull a tarball matching the tile's pinned version.
+# Bump the tile's version and propagate the install tarball URL to
+# SKILL.md, eval criteria, and research.md so installs pull a tarball
+# matching the tile's pinned version. (Only the install URL is rewritten
+# — example version strings inside research.md's manifest snippets are
+# illustrative templates and stay as-is.)
 #
 # Usage (from repo root): .tile/scripts/bump-version.sh <new-version>
 #   e.g. .tile/scripts/bump-version.sh 0.3.0

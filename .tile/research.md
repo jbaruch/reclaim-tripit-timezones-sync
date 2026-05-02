@@ -91,17 +91,13 @@ node /opt/tripit-reclaim/sync.mjs sync --output=json
 
 **Step 1: Run the script (deterministic)**
 - Check if `/opt/tripit-reclaim/sync.mjs` exists; if not, download + install (see above)
-- Run `node /opt/tripit-reclaim/sync.mjs sync`, capture stdout/stderr
+- Run `node /opt/tripit-reclaim/sync.mjs sync --output=json`, capture stdout/stderr
 
 **Step 2: Process output (AI-assisted)**
 
-The script output is **human-readable text, not JSON**. The skill must parse it by reading the text. Key signals to detect:
+The script outputs **a single JSON object** on stdout when `--output=json` is set (the default text mode is reserved for human eyes). The skill parses the JSON and decides what to surface. Key fields to inspect:
 
-**No-changes run** — look for this line in stdout:
-```
-No timezone changes detected — skipping timezone sync.
-```
-If this appears AND no OOO changes (`0 created, 0 deleted, 0 set to P2`) → silent, send nothing.
+**No-changes run** — `noChanges: true` and the OOO counts (`created`/`deleted`/`setToP2`) are all 0. Stay silent, send nothing.
 
 **Changes detected** — look for lines like:
 ```
