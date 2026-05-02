@@ -1,0 +1,22 @@
+name: Publish tile to Tessl registry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.tile/**'
+      - '.github/workflows/publish-tile.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: tesslio/patch-version-publish@v1
+        with:
+          token: ${{ secrets.TESSL_TOKEN }}
+          path: .tile

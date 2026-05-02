@@ -235,7 +235,27 @@ The tile is versioned (see `.tile/CHANGELOG.md`). The agent install URL in
 the exact version the tile expects rather than whatever happens to be on
 `main`.
 
-To cut a release:
+### Automated flow
+
+`.github/workflows/publish-tile.yml` runs on every push to `main` that
+touches `.tile/**`. It uses [`tesslio/patch-version-publish`][gha] to:
+
+1. Query the Tessl registry for the current published version
+2. If `tile.json` is ahead → publish that version as-is
+3. Otherwise → auto-bump the patch number, publish, and commit the
+   bumped `tile.json` back to `main` with `[skip ci]`
+
+[gha]: https://github.com/tesslio/tessl-smart-publish
+
+The workflow needs a `TESSL_TOKEN` repo secret. Create one with
+`tessl api-key create --workspace <ws> --name "ci-publish" --role publisher`
+and add it under Settings → Secrets and variables → Actions.
+
+### Cutting a minor or major release manually
+
+For routine changes, just push — the action auto-patches. For a
+deliberate minor or major release (e.g., the lodging-primary refactor,
+which warranted `0.1.0 → 0.2.0`):
 
 ```bash
 # 1. Bump version + propagate to SKILL.md, eval criteria, research.md
@@ -243,26 +263,22 @@ To cut a release:
 
 # 2. Add an entry to .tile/CHANGELOG.md, commit, open a PR, merge
 
-# 3. Tag the merge commit on main and push the tag
+# 3. Tag the merge commit on main so the in-skill curl URL resolves
 git checkout main && git pull --ff-only
 git tag v0.3.0
 git push origin v0.3.0
-
-# 4. Publish the tile to the Tessl registry
-cd .tile && tessl tile publish
 ```
 
-The two distribution channels:
-- The **GitHub tag** (`v0.3.0`) is what the in-skill install URL resolves
-  to. The skill's `curl ... archive/refs/tags/v<version>.tar.gz` step
-  downloads the runtime library (`sync.mjs`) at install time.
+The publish-tile workflow takes over from there.
+
+### Two distribution channels
+
+- The **GitHub tag** (`v0.3.0`) is what the in-skill install URL
+  resolves to. The skill's
+  `curl ... archive/refs/tags/v<version>.tar.gz` step downloads the
+  runtime library (`sync.mjs`) at install time.
 - The **Tessl registry** is what `tessl install jbaruch/reclaim-tripit-sync`
   resolves to. It carries the tile bundle (rules + skills + manifest).
-
-Both must be in sync. Bumping the tile version without publishing leaves
-consumers on the older skill (which references the older install URL),
-even after the new tag exists. Publishing without tagging leaves the
-new skill pointing at a tag that doesn't exist yet, so installs fail.
 
 Already-installed agent tiles continue to work on whatever version they
 were pinned to; only fresh installs and `tessl update` pick up the new
