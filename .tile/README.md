@@ -243,13 +243,27 @@ To cut a release:
 
 # 2. Add an entry to .tile/CHANGELOG.md, commit, open a PR, merge
 
-# 3. Tag the merge commit on main
+# 3. Tag the merge commit on main and push the tag
 git checkout main && git pull --ff-only
 git tag v0.3.0
 git push origin v0.3.0
+
+# 4. Publish the tile to the Tessl registry
+cd .tile && tessl tile publish
 ```
 
-The tag is what the install URL resolves to — pushing it makes the new
-version installable. Any agent tile that has already been installed from
-an earlier tag continues to work; only fresh installs pick up the new
+The two distribution channels:
+- The **GitHub tag** (`v0.3.0`) is what the in-skill install URL resolves
+  to. The skill's `curl ... archive/refs/tags/v<version>.tar.gz` step
+  downloads the runtime library (`sync.mjs`) at install time.
+- The **Tessl registry** is what `tessl install jbaruch/reclaim-tripit-sync`
+  resolves to. It carries the tile bundle (rules + skills + manifest).
+
+Both must be in sync. Bumping the tile version without publishing leaves
+consumers on the older skill (which references the older install URL),
+even after the new tag exists. Publishing without tagging leaves the
+new skill pointing at a tag that doesn't exist yet, so installs fail.
+
+Already-installed agent tiles continue to work on whatever version they
+were pinned to; only fresh installs and `tessl update` pick up the new
 version.
