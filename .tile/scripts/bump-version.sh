@@ -9,8 +9,9 @@
 #   e.g. .tile/scripts/bump-version.sh 0.3.0
 #
 # The script `cd`s into the .tile directory itself, so it can be invoked
-# from anywhere. After running, review the diff, commit, push, and tag
-# with v<new-version>.
+# from anywhere. After running, review the diff, commit, push, and merge
+# — the publish-tile GitHub Actions workflow handles tagging and
+# registry publish on merge to main (see "Next steps" output below).
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -64,9 +65,13 @@ echo
 echo "Next steps:"
 echo "  1. Add a CHANGELOG entry for $NEW under .tile/CHANGELOG.md"
 echo "  2. Review the diff, commit, push the branch, open a PR"
-echo "  3. After the PR merges, switch to main, fast-forward, and tag THAT commit:"
-echo "       git checkout main && git pull --ff-only"
-echo "       git tag v$NEW"
-echo "       git push origin v$NEW"
-echo "     (tagging the feature branch instead of the merged main commit"
-echo "      would point the install URL at unmerged code)"
+echo "  3. After the PR merges, the publish-tile workflow runs automatically."
+echo "     It pushes the v$NEW tag (so the in-skill curl URL resolves),"
+echo "     publishes the tile to the Tessl registry, and tags any auto-"
+echo "     bumped patch version. No manual 'git tag' or 'tessl tile publish'"
+echo "     is needed."
+echo
+echo "     The publish step requires a TESSL_TOKEN repo secret with"
+echo "     publisher role under Settings → Secrets and variables →"
+echo "     Actions. Without it, the workflow run fails at the publish"
+echo "     step (the pre-tag step still succeeds)."
