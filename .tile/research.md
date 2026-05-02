@@ -104,13 +104,13 @@ The script outputs **a single JSON object** on stdout when `--output=json` is se
 - `segments[]` — full deduplicated post-sync segment list (`{timezone, from, to, label}`), useful for showing the resulting timeline.
 - `ooo` — `{created, deleted, setToP2}` counts when Google Calendar is configured; `null` otherwise.
 - `conflicts[]` — overlap warnings as `{trip1, trip2, overlap}` for any cross-trip date conflict.
-- `errors[]` — non-fatal errors (fatal errors also exit non-zero with the message in `errors[]` before the JSON is printed).
+- `errors[]` — populated only on fatal failure (missing env var or thrown exception). On fatal failure the script still prints the JSON to stdout (with `errors[]` populated), then writes `FATAL ERROR: <message>` to stderr, then exits non-zero. Consumers should always parse the JSON first; check `errors[]` to detect failure rather than relying on stderr.
 
 Summarize what changed: new timezone segments, OOO blocks created/deleted, P2 priorities set.
 
 **Overlapping trips** — `conflicts[]` is non-empty. Each entry names both trips and the overlap boundary date. Flag these as a warning in the output — they produce potentially conflicting timezone segments.
 
-**Errors** — `errors[]` is populated; fatal errors also exit non-zero with the message on stderr before the JSON is emitted (`FATAL ERROR: <message>`). Missing env vars print to stderr (`Missing TRIPIT_ICAL_URL environment variable`).
+**Errors** — `errors[]` non-empty signals fatal failure. The script emits the JSON to stdout first (with `errors[]` populated), then prints `FATAL ERROR: <message>` to stderr, then exits non-zero. Missing env vars (`Missing TRIPIT_ICAL_URL environment variable`) follow the same pattern.
 
 **Dry-run mode** sets `mode: 'dry-run'` in the JSON. No `timezoneChanges` or `ooo` activity is reported because nothing was written. Useful for onboarding/credential verification.
 
