@@ -84,7 +84,7 @@ if [ ! -f /opt/tripit-reclaim/sync.mjs ]; then
     | tar xz --strip-components=1 -C /opt/tripit-reclaim
   cd /opt/tripit-reclaim && npm ci --omit=dev
 fi
-node /opt/tripit-reclaim/sync.mjs sync
+node /opt/tripit-reclaim/sync.mjs sync --output=json
 ```
 
 ### `sync-tripit` skill — architecture
