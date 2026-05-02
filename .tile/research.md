@@ -97,7 +97,7 @@ node /opt/tripit-reclaim/sync.mjs sync --output=json
 
 The script outputs **a single JSON object** on stdout when `--output=json` is set (the default text mode is reserved for human eyes). The skill parses the JSON and decides what to surface. Key fields to inspect:
 
-**No-changes run** — `noChanges: true` and the OOO counts (`created`/`deleted`/`setToP2`) are all 0. Stay silent, send nothing.
+**No-changes run** — `noChanges: true` and either `ooo` is `null` (Google Calendar not configured, or dry-run) or all of `ooo.created`/`ooo.deleted`/`ooo.setToP2` are 0. Stay silent, send nothing.
 
 **Changes detected** — `noChanges: false`. The JSON carries:
 - `timezoneChanges[]` — array of `{action: 'create'|'delete', timezone, from, to}` entries.
