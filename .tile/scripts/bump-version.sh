@@ -9,8 +9,9 @@
 #   e.g. .tile/scripts/bump-version.sh 0.3.0
 #
 # The script `cd`s into the .tile directory itself, so it can be invoked
-# from anywhere. After running, review the diff, commit, push, and tag
-# with v<new-version>.
+# from anywhere. After running, review the diff, commit, push, and merge
+# — the publish-tile GitHub Actions workflow handles tagging and
+# registry publish on merge to main (see "Next steps" output below).
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
