@@ -2,10 +2,12 @@
 # Bump the tile's version and propagate to SKILL.md, eval criteria, and
 # research.md so installs pull a tarball matching the tile's pinned version.
 #
-# Usage: scripts/bump-version.sh <new-version>
-#   e.g. scripts/bump-version.sh 0.3.0
+# Usage (from repo root): .tile/scripts/bump-version.sh <new-version>
+#   e.g. .tile/scripts/bump-version.sh 0.3.0
 #
-# After running, review the diff, commit, push, and tag with v<new-version>.
+# The script `cd`s into the .tile directory itself, so it can be invoked
+# from anywhere. After running, review the diff, commit, push, and tag
+# with v<new-version>.
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
