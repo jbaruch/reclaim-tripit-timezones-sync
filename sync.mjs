@@ -145,11 +145,18 @@ try {
     console.log(`    ${s.startDate} → ${s.endDate}  [${s.timezone}]`);
   }
 
-  // Populate result segments
+  // Populate result segments. `from` / `to` (date-only YYYY-MM-DD)
+  // preserve the JSON contract existing consumers depend on; the
+  // adjacent `from_dt` / `to_dt` (ISO 8601 UTC) carry the underlying
+  // wall-clock so a downstream walker can resolve at the actual
+  // flight-arrival / check-in moment instead of UTC midnight of the
+  // departure day. See jbaruch/nanoclaw-admin#229.
   result.segments = segments.map(s => ({
     timezone: s.timezone,
     from: s.startDate,
     to: s.endDate,
+    from_dt: s.startDateTime,
+    to_dt: s.endDateTime,
     label: s.label,
   }));
 
