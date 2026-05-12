@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — 2026-05-11
+
+- Every segment in the JSON output now carries both date-only
+  (`from`/`to`) and ISO 8601 UTC datetime (`from_dt`/`to_dt`)
+  boundaries. Date-only fields are preserved verbatim for the Reclaim
+  API contract; datetime fields are for sub-day-aware downstream
+  consumers that need to resolve the active timezone at actual flight
+  arrival or check-in time, not at UTC midnight of the boundary date.
+  Fixes a downstream walker bug where the active timezone could flip
+  hours before the user actually arrived in the new zone.
+- `deduplicateSegments` now uses datetime for sort, overlap detection,
+  merge advance, and the empty-segment filter (date-only fallback for
+  legacy callers). Same-calendar-date overlaps are now correctly
+  clipped instead of slipping through.
+
 ## 0.2.0 — 2026-05-02
 
 - Lodging is now the primary signal for timezone segments. Where the user
