@@ -15,7 +15,7 @@ description: >
 INSTALL_DIR="$HOME/.tripit-reclaim"
 if [ ! -f "$INSTALL_DIR/sync.mjs" ]; then
   mkdir -p "$INSTALL_DIR"
-  curl -sL https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.2.0.tar.gz \
+  curl -sL https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.3.0.tar.gz \
     | tar xz --strip-components=1 -C "$INSTALL_DIR"
   cd "$INSTALL_DIR" && npm ci --omit=dev
 fi

@@ -59,7 +59,14 @@ The `--output=json` flag works with both `dry-run` and `sync` modes. When set, t
     { "action": "create", "timezone": "America/Chicago", "from": "2026-04-01", "to": "2026-04-05" }
   ],
   "segments": [
-    { "timezone": "America/Chicago", "from": "2026-04-01", "to": "2026-04-05", "label": "KubeCon - Austin" }
+    {
+      "timezone": "America/Chicago",
+      "from": "2026-04-01",
+      "to": "2026-04-05",
+      "from_dt": "2026-04-01T20:15:00.000Z",
+      "to_dt": "2026-04-05T17:00:00.000Z",
+      "label": "KubeCon - Austin"
+    }
   ],
   "ooo": { "created": 2, "deleted": 1, "setToP2": 1 },
   "conflicts": [
@@ -68,6 +75,8 @@ The `--output=json` flag works with both `dry-run` and `sync` modes. When set, t
   "errors": []
 }
 ```
+
+Each segment carries both date-only (`from`/`to`) and ISO 8601 UTC datetime (`from_dt`/`to_dt`) boundaries. Date-only is preserved verbatim for the Reclaim API contract and for date-only consumers; datetime is for sub-day-aware downstream consumers that need to resolve the active timezone at actual flight arrival or check-in time, not at UTC midnight of the boundary date.
 
 Human-readable output remains the default.
 
