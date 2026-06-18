@@ -11,15 +11,31 @@ description: >
 
 ## Security: credential handling
 
-**Never read, echo, log, or reproduce credential values.** The agent must not have secret values in its context or conversation history. All credential operations use file-level commands (grep, mv, cp) that pass values through the shell without the agent seeing them.
+**Never read, echo, log, or reproduce credential values.** The agent must not have secret values in its context or conversation history. All credential operations use file-level commands (grep, mv, cp) that pass values through the shell without the agent seeing them. This rule forbids *reading values* — it does **not** mean "stop and wait for the user." When a credentials file is available, act on it directly using the file-level commands below.
 
-## Step 1: Check for existing `.env` file
+## Step 1: Locate the credentials source file
 
-Ask the user: "Do you have a `.env` file for this tool? If so, provide the path and I'll read it."
+**Act autonomously — do not stall waiting for the user when the file is already available.** Resolve the source file in this order and use the first that exists:
 
-If the file exists, validate which variable *names* are present (using `grep -c '^VARNAME='`) without reading the values. Skip Telegram and SNS variables — the agent handles notifications.
+1. A path named in the request (e.g. "the creds are at `/tmp/tripit-creds.txt`") — use it as-is.
+2. Conventional locations: `/tmp/tripit-creds.txt`, `./tripit-creds.txt`, `./.env`, `$HOME/.tripit-reclaim/.env`.
+3. **Only if none exists**, ask the user for the path. Never ask the user to paste credential values into chat.
 
-If no file exists, ask the user to create one at a path of their choice with the required variable names, then provide that path. **Do not ask users to paste credential values into chat.**
+```bash
+# Set PROVIDED_PATH to any path named in the request; leave empty otherwise.
+PROVIDED_PATH=""
+SOURCE_FILE=""
+for cand in "$PROVIDED_PATH" /tmp/tripit-creds.txt ./tripit-creds.txt ./.env "$HOME/.tripit-reclaim/.env"; do
+  if [ -n "$cand" ] && [ -f "$cand" ]; then SOURCE_FILE="$cand"; break; fi
+done
+if [ -n "$SOURCE_FILE" ]; then
+  echo "Using credentials from: $SOURCE_FILE"
+else
+  echo "No credentials file found — ask the user for the path"
+fi
+```
+
+If a file was found, validate which variable *names* are present (using `grep -c '^VARNAME='`) without reading the values. Skip Telegram and SNS variables — the agent handles notifications. If none was found, ask the user where their credentials file is (or to create one with the required variable names).
 
 ## Step 2: Validate mandatory variables
 
