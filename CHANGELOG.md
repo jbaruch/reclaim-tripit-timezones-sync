@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.3 — 2026-06-18
+
+- Onboarding skill is now autonomous-first: it resolves the credentials
+  source file from an explicitly provided path or common locations and
+  acts on it directly, only asking the user when nothing is discoverable.
+  Previously it always stopped to ask first, which stalled autonomous
+  agents when the file was already available. The "never read/echo
+  credential values" guardrail is unchanged.
+
 ## 0.3.2 — 2026-06-18
 
 - Stop creating redundant travel-timezone overrides that just restate the
