@@ -1,6 +1,6 @@
 {
   "name": "jbaruch/reclaim-tripit-sync",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Syncs TripIt travel itineraries to Reclaim.ai timezone segments and Google Calendar OOO blocks.",
   "private": false
 }

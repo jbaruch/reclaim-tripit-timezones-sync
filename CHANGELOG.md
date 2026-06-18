@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.2 — 2026-06-18
+
+- Stop creating redundant travel-timezone overrides that just restate the
+  home timezone (e.g. Central→Central for domestic trips). Reclaim already
+  falls back to the home timezone wherever no override applies, so those
+  entries were noise. The home timezone is read from the `HOME_TZ` env var
+  when set, otherwise from Reclaim's account `defaultTimezone`. Adds a
+  `homeTimezone` field to the JSON output. Dry-run now also queries Reclaim,
+  so it reports the exact segment list sync would push and validates the
+  Reclaim token.
+
 ## 0.3.1 — 2026-06-18
 
 - Repackaged from the Tessl *tile* format to the *plugin* format. The

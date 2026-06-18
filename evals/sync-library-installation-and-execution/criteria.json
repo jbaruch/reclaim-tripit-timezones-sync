@@ -10,7 +10,7 @@
     {
       "name": "Correct download URL",
       "max_score": 12,
-      "description": "Installation uses the exact GitHub tarball URL for the pinned version: https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.3.1.tar.gz"
+      "description": "Installation uses the exact GitHub tarball URL for the pinned version: https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.3.2.tar.gz"
     },
     {
       "name": "User-space install path",
