@@ -42,6 +42,7 @@ If either is missing, explain where to find it and ask the user to add it to the
 | Feature | Variables needed | What to tell the user |
 |---|---|---|
 | Google Calendar OOO blocks | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` | "Want OOO calendar blocks for travel? I need Google OAuth2 credentials. See [Google Calendar setup](https://github.com/jbaruch/reclaim-tripit-timezones-sync#google-calendar-ooo-blocks) in the repo README." |
+| Home timezone | `HOME_TZ` | "What's your home timezone (e.g. `America/Chicago`)? I'll skip redundant overrides that just restate it. Optional — if you skip it I'll use your Reclaim account's default timezone." |
 | Trip filtering | `TRIPIT_IGNORE_TRIPS`, `TRIPIT_IGNORE_KEYWORDS` | "Any trips in TripIt you want to exclude from syncing? Give me names or keywords." |
 | Retry tuning | `OOO_RETRY_DELAY_MS` | Only mention if the user reports OOO priority issues. Default (60s) works for most setups. |
 
@@ -54,7 +55,7 @@ Filter the source file to keep only relevant variables, writing directly to the 
 ```bash
 INSTALL_DIR="$HOME/.tripit-reclaim"
 mkdir -p "$INSTALL_DIR"
-grep -E '^(TRIPIT_ICAL_URL|RECLAIM_API_TOKEN|GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET|GOOGLE_REFRESH_TOKEN|TRIPIT_IGNORE_TRIPS|TRIPIT_IGNORE_KEYWORDS|OOO_RETRY_DELAY_MS)=' "$SOURCE_FILE" > "$INSTALL_DIR/.env"
+grep -E '^(TRIPIT_ICAL_URL|RECLAIM_API_TOKEN|HOME_TZ|GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET|GOOGLE_REFRESH_TOKEN|TRIPIT_IGNORE_TRIPS|TRIPIT_IGNORE_KEYWORDS|OOO_RETRY_DELAY_MS)=' "$SOURCE_FILE" > "$INSTALL_DIR/.env"
 chmod 600 "$INSTALL_DIR/.env"
 ```
 

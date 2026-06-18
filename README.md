@@ -229,6 +229,7 @@ When configured, you'll receive a message listing the new timezone overrides whe
 |---|---|---|
 | `TRIPIT_ICAL_URL` | Yes | Your private TripIt iCal feed URL |
 | `RECLAIM_API_TOKEN` | Yes | Reclaim.ai API token |
+| `HOME_TZ` | No | Your home timezone (IANA, e.g. `America/Chicago`). Segments in this timezone are skipped as redundant home→home overrides. Defaults to Reclaim's account timezone when readable |
 | `TELEGRAM_BOT_TOKEN` | No | Telegram bot token for change notifications |
 | `TELEGRAM_CHAT_ID` | No | Telegram chat ID to send notifications to |
 | `GOOGLE_CLIENT_ID` | No | Google OAuth2 client ID (enables OOO blocks) |

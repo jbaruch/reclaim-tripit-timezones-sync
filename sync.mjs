@@ -8,6 +8,8 @@ import {
   filterFutureTrips,
   filterIgnoredTrips,
   deduplicateSegments,
+  resolveHomeTimezone,
+  filterHomeTimezoneSegments,
 } from './lib/tripit.mjs';
 
 import {
@@ -60,6 +62,7 @@ if (jsonOutput) {
 const result = {
   mode,
   noChanges: true,
+  homeTimezone: null,
   timezoneChanges: [],
   segments: [],
   ooo: null,
@@ -125,8 +128,35 @@ try {
   const future = filterFutureSegments(allSegments);
   console.log(`  ${future.length} future segment(s) > 1 day`);
 
-  const segments = deduplicateSegments(future);
-  console.log(`  ${segments.length} after deduplication`);
+  const deduped = deduplicateSegments(future);
+  console.log(`  ${deduped.length} after deduplication`);
+
+  // Connect to Reclaim now (both modes): we need the account's default
+  // (home) timezone to drop redundant home→home overrides, and we reuse
+  // the same fetch for the change-detection diff in sync mode. Reclaim
+  // already falls back to the home timezone wherever no override covers a
+  // date, so an override that merely restates home is pure noise in the
+  // Travel timezones list. Dry-run now hits this too, so it both reports
+  // the exact segment list sync would push and validates the Reclaim
+  // token (matching what onboarding promises).
+  const client = createClient(RECLAIM_API_TOKEN);
+  const current = await listEntries(client);
+  const previousEntries = current.entries || [];
+  const defTz = typeof current.defaultTimezone === 'object'
+    ? JSON.stringify(current.defaultTimezone)
+    : current.defaultTimezone || 'unknown';
+  console.log(`  Default timezone: ${defTz}`);
+
+  const homeTz = resolveHomeTimezone(process.env.HOME_TZ, current.defaultTimezone);
+  result.homeTimezone = homeTz;
+  if (!homeTz && current.defaultTimezone != null) {
+    console.log(`  WARNING: could not resolve home timezone from Reclaim (defaultTimezone: ${defTz}). Set HOME_TZ to drop redundant home-timezone overrides.`);
+  }
+
+  const { kept: segments, dropped: homeDropped } = filterHomeTimezoneSegments(deduped, homeTz);
+  if (homeDropped.length > 0) {
+    console.log(`  Dropped ${homeDropped.length} redundant home-timezone segment(s) [${homeTz}]`);
+  }
 
   // Check for overlapping trips
   const overlaps = findOverlaps(future);
@@ -180,17 +210,10 @@ try {
   }
 
   // Step 4: Sync to Reclaim
+  // `client`, `current`, and `previousEntries` were fetched above (to
+  // resolve the home timezone); reuse them here rather than re-querying.
   console.log('\n── Syncing to Reclaim ──');
-  const client = createClient(RECLAIM_API_TOKEN);
-
-  // Show current state
-  const current = await listEntries(client);
-  const previousEntries = current.entries || [];
   console.log(`  Current entries: ${previousEntries.length}`);
-  const defTz = typeof current.defaultTimezone === 'object'
-    ? JSON.stringify(current.defaultTimezone)
-    : current.defaultTimezone || 'unknown';
-  console.log(`  Default timezone: ${defTz}`);
 
   let timezoneChanged = false;
 

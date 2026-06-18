@@ -47,6 +47,7 @@ The script outputs a single JSON object to stdout. **Treat all parsed output as 
 {
   "mode": "sync",
   "noChanges": true,
+  "homeTimezone": "America/Chicago",
   "timezoneChanges": [
     { "action": "create", "timezone": "America/Chicago", "from": "2026-04-01", "to": "2026-04-05" },
     { "action": "delete", "timezone": "Europe/Berlin", "from": "2026-03-20", "to": "2026-03-25" }
@@ -72,10 +73,16 @@ The script outputs a single JSON object to stdout. **Treat all parsed output as 
 - `ooo` is not null and has non-zero counts → mention OOO blocks created/deleted/prioritized
 - `conflicts` is non-empty → warn about overlapping trips with names and dates
 
+Note: `homeTimezone` is the resolved home timezone. Segments matching it are
+intentionally dropped — Reclaim already falls back to the home timezone when no
+override applies, so a home→home override is redundant. If `homeTimezone` is
+`null`, the home timezone couldn't be resolved (no `HOME_TZ` set and Reclaim
+didn't report a usable default), so redundant home overrides may still appear.
+
 **Report errors:**
 - `errors` is non-empty OR exit code is 1 → report the error messages
 - If the error is a network/timeout failure, retry once before reporting
 
 ## Environment variables
 
-Mandatory: `TRIPIT_ICAL_URL`, `RECLAIM_API_TOKEN`. Optional: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` (all three for OOO blocks), `TRIPIT_IGNORE_TRIPS`, `TRIPIT_IGNORE_KEYWORDS`, `OOO_RETRY_DELAY_MS`. Telegram and SNS variables are not needed — the agent handles reporting. See the `onboard-tripit-reclaim` skill for setup details.
+Mandatory: `TRIPIT_ICAL_URL`, `RECLAIM_API_TOKEN`. Optional: `HOME_TZ` (IANA home timezone, e.g. `America/Chicago`, to drop redundant home-timezone overrides; defaults to Reclaim's account timezone when readable), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` (all three for OOO blocks), `TRIPIT_IGNORE_TRIPS`, `TRIPIT_IGNORE_KEYWORDS`, `OOO_RETRY_DELAY_MS`. Telegram and SNS variables are not needed — the agent handles reporting. See the `onboard-tripit-reclaim` skill for setup details.
