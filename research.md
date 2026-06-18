@@ -80,7 +80,7 @@ The skill checks for the library and downloads it on first use — no pre-baking
 ```bash
 if [ ! -f /opt/tripit-reclaim/sync.mjs ]; then
   mkdir -p /opt/tripit-reclaim
-  curl -sL https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.3.0.tar.gz \
+  curl -sL https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.3.1.tar.gz \
     | tar xz --strip-components=1 -C /opt/tripit-reclaim
   cd /opt/tripit-reclaim && npm ci --omit=dev
 fi
@@ -283,6 +283,14 @@ Since Tessl v0.62.2, public tiles (`private: false` in tile.json) can be install
 
 ## 6. Tile Manifest Format
 
+> **Migration note:** This project has since moved from the Tessl *tile*
+> format to the *plugin* format. The manifest now lives in
+> `.tessl-plugin/plugin.json` with fields `name`, `version`, `description`,
+> and `private` — rules and skills are discovered by convention from the
+> `rules/` and `skills/` directories at the repo root (no explicit `rules`/
+> `skills`/`summary`/`docs` maps). The original tile research below is kept
+> as a historical design record.
+
 Based on `nanoclaw-core`'s `tile.json`, the manifest format is:
 
 ```json
@@ -332,7 +340,7 @@ Based on `nanoclaw-core`'s `tile.json`, the manifest format is:
 - `name` follows `owner/tile-name` convention (matches the nanoclaw-core pattern)
 - `private: false` — this tile is generic, not NanoClaw-specific
 - `rules` block contains always-on rules loaded when the tile is installed (the "never implement sync logic yourself" rule lives here)
-- `skills` block lists on-demand skills; `path` is relative to the tile root (the `.tile/` directory in the repo)
+- `skills` block lists on-demand skills; `path` is relative to the tile root (under the plugin format, skills are instead discovered from the `skills/` directory at the repo root)
 - No env var declarations in the manifest itself — env vars are documented in the skill files and handled by the onboarding skill
 
 ---

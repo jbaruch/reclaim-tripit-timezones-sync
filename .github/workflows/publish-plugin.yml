@@ -1,0 +1,86 @@
+name: Publish plugin to Tessl registry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.tessl-plugin/**'
+      - 'rules/**'
+      - 'skills/**'
+      - 'evals/**'
+      - 'README.md'
+
+# Serialize publishes on main: a closely-following push could otherwise race
+# (both runs querying the same registry version, both publishing the same
+# version). Queue subsequent runs instead of cancelling so no push is lost.
+concurrency:
+  group: publish-plugin-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # push the vX.Y.Z tag
+  id-token: write   # tessl CLI OIDC auth
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Detect plugin.json version change in this push
+        id: vchange
+        # Only tag if the user actually bumped the plugin.json version in
+        # this push. Otherwise a missing tag is a manual fix-up situation,
+        # not something we should auto-create at the wrong commit.
+        run: |
+          BEFORE="${{ github.event.before }}"
+          LOCAL_VERSION=$(jq -r '.version' .tessl-plugin/plugin.json)
+          echo "version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "First push or unknown before-ref; not tagging"
+            exit 0
+          fi
+          PREV_VERSION=$(git show "$BEFORE:.tessl-plugin/plugin.json" 2>/dev/null | jq -r '.version' 2>/dev/null || echo "")
+          if [ -n "$PREV_VERSION" ] && [ "$PREV_VERSION" != "$LOCAL_VERSION" ]; then
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+            echo "plugin.json version bumped: $PREV_VERSION → $LOCAL_VERSION"
+          else
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "plugin.json version unchanged ($LOCAL_VERSION)"
+          fi
+
+      - name: Tag the bumped plugin.json version
+        # Runs only when this push actually bumped the version. The in-skill
+        # curl URL inside the bundle references vX.Y.Z, so tag this commit
+        # BEFORE the registry publish — consumers who fresh-install the new
+        # plugin must not 404 on the install URL. Use `git ls-remote` so the
+        # existence check doesn't depend on the local checkout having fetched
+        # tags.
+        if: steps.vchange.outputs.bumped == 'true'
+        run: |
+          TAG="v${{ steps.vchange.outputs.version }}"
+          if [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
+            echo "Tag $TAG already exists on origin, no tag needed"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "Created tag $TAG at this commit"
+          fi
+
+      - name: Install Tessl CLI
+        uses: tesslio/setup-tessl@v2
+        with:
+          token: ${{ secrets.TESSL_TOKEN }}
+
+      - name: Lint plugin
+        run: tessl plugin lint
+
+      - name: Publish plugin to Tessl registry
+        # Publishes the version pinned in .tessl-plugin/plugin.json. Plugins
+        # do not auto-bump the patch number, so the published version always
+        # equals plugin.json — which is why the tag step above is exact.
+        run: tessl plugin publish

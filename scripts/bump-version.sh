@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Bump the tile's version and propagate the install tarball URL to
+# Bump the plugin's version and propagate the install tarball URL to
 # SKILL.md, eval criteria, and research.md so installs pull a tarball
-# matching the tile's pinned version. (Only the install URL is rewritten
+# matching the plugin's pinned version. (Only the install URL is rewritten
 # — example version strings inside research.md's manifest snippets are
 # illustrative templates and stay as-is.)
 #
-# Usage (from repo root): .tile/scripts/bump-version.sh <new-version>
-#   e.g. .tile/scripts/bump-version.sh 0.3.0
+# Usage (from repo root): scripts/bump-version.sh <new-version>
+#   e.g. scripts/bump-version.sh 0.3.0
 #
-# The script `cd`s into the .tile directory itself, so it can be invoked
-# from anywhere. After running, review the diff, commit, push, and merge
-# — the publish-tile GitHub Actions workflow handles tagging and
-# registry publish on merge to main (see "Next steps" output below).
+# The script `cd`s to the repo root itself, so it can be invoked from
+# anywhere. After running, review the diff, commit, push, and merge —
+# the publish-plugin GitHub Actions workflow handles tagging and registry
+# publish on merge to main (see "Next steps" output below).
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -26,18 +26,18 @@ if ! [[ "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 2
 fi
 
-# Run from the .tile directory so paths are relative.
+# Run from the repo root (parent of scripts/) so paths are relative.
 cd "$(dirname "$0")/.."
 
-CURRENT=$(node -e "console.log(require('./tile.json').version)")
+CURRENT=$(node -e "console.log(require('./.tessl-plugin/plugin.json').version)")
 echo "Bumping $CURRENT → $NEW"
 
-# tile.json
+# plugin.json
 node -e "
   const fs = require('fs');
-  const t = JSON.parse(fs.readFileSync('./tile.json', 'utf8'));
+  const t = JSON.parse(fs.readFileSync('./.tessl-plugin/plugin.json', 'utf8'));
   t.version = '$NEW';
-  fs.writeFileSync('./tile.json', JSON.stringify(t, null, 2) + '\n');
+  fs.writeFileSync('./.tessl-plugin/plugin.json', JSON.stringify(t, null, 2) + '\n');
 "
 
 # SKILL.md install URL
@@ -57,21 +57,20 @@ rm -f ./research.md.bak
 
 echo
 echo "Updated:"
-echo "  .tile/tile.json"
-echo "  .tile/skills/sync-tripit/SKILL.md"
-echo "  .tile/evals/sync-library-installation-and-execution/criteria.json"
-echo "  .tile/research.md"
+echo "  .tessl-plugin/plugin.json"
+echo "  skills/sync-tripit/SKILL.md"
+echo "  evals/sync-library-installation-and-execution/criteria.json"
+echo "  research.md"
 echo
 echo "Next steps:"
-echo "  1. Add a CHANGELOG entry for $NEW under .tile/CHANGELOG.md"
+echo "  1. Add a CHANGELOG entry for $NEW under CHANGELOG.md"
 echo "  2. Review the diff, commit, push the branch, open a PR"
-echo "  3. After the PR merges, the publish-tile workflow runs automatically."
-echo "     It pushes the v$NEW tag (so the in-skill curl URL resolves),"
-echo "     publishes the tile to the Tessl registry, and tags any auto-"
-echo "     bumped patch version. No manual 'git tag' or 'tessl tile publish'"
-echo "     is needed."
+echo "  3. After the PR merges, the publish-plugin workflow runs automatically."
+echo "     It pushes the v$NEW tag (so the in-skill curl URL resolves) and"
+echo "     publishes the plugin to the Tessl registry. No manual 'git tag'"
+echo "     or 'tessl plugin publish' is needed."
 echo
 echo "     The publish step requires a TESSL_TOKEN repo secret with"
 echo "     publisher role under Settings → Secrets and variables →"
-echo "     Actions. Without it, the workflow run fails at the publish"
-echo "     step (the pre-tag step still succeeds)."
+echo "     Actions. Without it, the workflow run fails at the publish step"
+echo "     (the tag step still succeeds)."

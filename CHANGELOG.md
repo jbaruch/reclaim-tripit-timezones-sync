@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 — 2026-06-18
+
+- Repackaged from the Tessl *tile* format to the *plugin* format. The
+  manifest moved to `.tessl-plugin/plugin.json`; rules and skills now live
+  at the repo root and are discovered by convention. Sync behavior is
+  unchanged. Publishing is handled by `tessl plugin publish` via the
+  `publish-plugin` workflow (the in-skill install URL now pins `v0.3.1`).
+
 ## 0.3.0 — 2026-05-11
 
 - Every segment in the JSON output now carries both date-only

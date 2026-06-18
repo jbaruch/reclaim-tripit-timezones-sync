@@ -1,0 +1,28 @@
+# The plugin shares its root with the deterministic sync library (the Node
+# app that the skill installs via curl). None of these are part of the
+# published plugin package — exclude them from orphaned-file warnings.
+
+# Node sync library
+node_modules/
+lib/
+sync.mjs
+package.json
+package-lock.json
+jsconfig.json
+
+# Container / deployment
+Dockerfile
+.dockerignore
+entrypoint.sh
+deploy.sh
+AWS_DEPLOYMENT.md
+
+# Build artifacts & secrets
+*.tar.gz
+.env
+.env.example
+
+# Repo infra (not plugin content)
+.github/
+scripts/
+.claude/
