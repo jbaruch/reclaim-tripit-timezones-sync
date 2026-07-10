@@ -1,6 +1,10 @@
-// Install undici ProxyAgent before any HTTP when running under OneCLI
-// (`ONECLI_URL` set by `onecli run`). No-op otherwise — keeps non-OneCLI
-// behavior byte-for-byte identical. Must be the first side-effect import.
+// OneCLI mode: install undici ProxyAgent before any HTTP.
+// ESM evaluates all static imports (the whole dependency graph) before this
+// module body runs, so import order does NOT control when the agent is
+// installed — the explicit call below does. That is safe because lib/*
+// only export functions; they do not perform HTTP at load time. Any future
+// top-level HTTP in an imported module would race this and break OneCLI.
+// No-op when ONECLI_URL is unset (byte-for-byte identical non-OneCLI path).
 import { installProxyDispatcher } from './lib/proxy.mjs';
 installProxyDispatcher();
 
