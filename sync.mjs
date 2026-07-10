@@ -288,7 +288,8 @@ try {
       // Surface OneCLI Google-connection misconfig clearly (gateway 401
       // when the built-in Google Calendar connection isn't authorized).
       // Don't assume `err` is an Error — libraries sometimes throw strings
-      // or plain objects; preserve the original via `cause`.
+      // or plain objects; always rethrow Error so the top-level catch gets
+      // a real message, and preserve the original via `cause`.
       const msg = err instanceof Error ? err.message : String(err);
       if (process.env.ONECLI_URL && /401|unauthorized|invalid.?credential/i.test(msg)) {
         throw new Error(
@@ -299,7 +300,8 @@ try {
           { cause: err },
         );
       }
-      throw err;
+      if (err instanceof Error) throw err;
+      throw new Error(msg, { cause: err });
     }
     result.ooo = {
       created: oooStats.created,
@@ -319,12 +321,13 @@ try {
   console.log('\nSync complete!');
   if (jsonOutput) _log(JSON.stringify(result));
 } catch (err) {
+  const fatalMsg = err instanceof Error ? err.message : String(err);
   if (jsonOutput) {
-    result.errors.push(err.message);
+    result.errors.push(fatalMsg);
     _log(JSON.stringify(result));
   }
-  _error(`\nFATAL ERROR: ${err.message}`);
-  _error(err.stack);
+  _error(`\nFATAL ERROR: ${fatalMsg}`);
+  if (err instanceof Error && err.stack) _error(err.stack);
   process.exit(1);
 }
 
