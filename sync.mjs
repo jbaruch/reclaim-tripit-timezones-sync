@@ -278,12 +278,16 @@ try {
     } catch (err) {
       // Surface OneCLI Google-connection misconfig clearly (gateway 401
       // when the built-in Google Calendar connection isn't authorized).
-      if (process.env.ONECLI_URL && /401|unauthorized|invalid.?credential/i.test(err.message)) {
+      // Don't assume `err` is an Error — libraries sometimes throw strings
+      // or plain objects; preserve the original via `cause`.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (process.env.ONECLI_URL && /401|unauthorized|invalid.?credential/i.test(msg)) {
         throw new Error(
-          `Google Calendar OOO failed under OneCLI (${err.message}). ` +
+          `Google Calendar OOO failed under OneCLI (${msg}). ` +
           'Configure and authorize the OneCLI Google Calendar connection ' +
           '(`onecli apps configure`) so the gateway can inject a real Bearer, ' +
           'or set ENABLE_OOO=0 to skip OOO.',
+          { cause: err },
         );
       }
       throw err;
