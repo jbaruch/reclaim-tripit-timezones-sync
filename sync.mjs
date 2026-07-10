@@ -4,7 +4,10 @@
 // installed — the explicit call below does. That is safe because lib/*
 // only export functions; they do not perform HTTP at load time. Any future
 // top-level HTTP in an imported module would race this and break OneCLI.
-// No-op when ONECLI_URL is unset (byte-for-byte identical non-OneCLI path).
+// When ONECLI_URL is unset, installProxyDispatcher() is a no-op: no ProxyAgent,
+// no dispatcher swap, HTTP behavior unchanged. Note: importing this module
+// still loads `undici` (a declared dependency); the no-op is about runtime
+// HTTP routing, not zero module-graph difference.
 import { installProxyDispatcher } from './lib/proxy.mjs';
 installProxyDispatcher();
 

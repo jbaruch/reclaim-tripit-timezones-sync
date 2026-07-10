@@ -217,7 +217,7 @@ Ignored trips are excluded from both timezone segments and OOO calendar blocks. 
 
 When the sync is launched under [OneCLI](https://github.com/onecli/onecli) (`onecli run node sync.mjs`), real TripIt / Reclaim / Google credentials can live in the OneCLI vault instead of the process environment. The sync sends **placeholder** values; the gateway MITM-swaps them on the outbound request.
 
-**Everything here is opt-in and gated on `ONECLI_URL`.** When `ONECLI_URL` is unset, behavior is identical to a normal run — no proxy, no undici dispatcher, OAuth refresh for Google as before.
+**Everything here is opt-in and gated on `ONECLI_URL`.** When `ONECLI_URL` is unset, HTTP routing matches a normal run — no ProxyAgent, no dispatcher swap, OAuth refresh for Google as before. (The `undici` package is still a declared dependency and may load if something imports `lib/proxy.mjs`.)
 
 ```bash
 # onecli run injects ONECLI_URL, HTTPS_PROXY, and NODE_EXTRA_CA_CERTS
