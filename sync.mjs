@@ -1,3 +1,8 @@
+// OneCLI proxy install is deferred until after CLI/output parsing (see
+// installProxyDispatcher() inside the main try). Importing here loads undici
+// but does not install a dispatcher until the explicit call.
+import { installProxyDispatcher } from './lib/proxy.mjs';
+
 import {
   fetchIcalEvents,
   extractTrips,
@@ -24,6 +29,7 @@ import {
 
 import {
   createGCalClient,
+  oooSkipReason,
   listOooEvents,
   createOooEvent,
   deleteOooEvent,
@@ -106,6 +112,12 @@ console.log(`\n=== TripIt → Reclaim Travel Timezone Sync ===`);
 console.log(`Mode: ${mode}\n`);
 
 try {
+  // OneCLI: install undici ProxyAgent before any HTTP. Runs inside try so
+  // missing HTTPS_PROXY (etc.) exits through the same fatal path as other
+  // errors — including --output=json shaping. No-op when ONECLI_URL unset.
+  // Safe here because lib/* only export functions; they do not HTTP at load.
+  installProxyDispatcher();
+
   // Step 1: Fetch and parse iCal feed
   const events = await fetchIcalEvents(TRIPIT_ICAL_URL);
   const allTrips = extractTrips(events);
@@ -193,16 +205,26 @@ try {
   // Get future trips for OOO sync
   const futureTrips = filterFutureTrips(trips);
 
+  // Google Calendar client (null when OOO not configured / not opted in).
+  // In OneCLI mode the gateway injects Google auth; createGCalClient ignores
+  // the real OAuth values and sends a static placeholder Bearer instead.
+  const googleCreds = {
+    clientId: GOOGLE_CLIENT_ID,
+    clientSecret: GOOGLE_CLIENT_SECRET,
+    refreshToken: GOOGLE_REFRESH_TOKEN,
+  };
+  const gcal = createGCalClient(googleCreds);
+
   if (mode === 'dry-run') {
     console.log('\nDry run complete. No changes made to Reclaim.');
 
-    if (futureTrips.length > 0 && GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
+    if (futureTrips.length > 0 && gcal) {
       console.log(`\n── OOO blocks (would create) ──`);
       for (const t of futureTrips) {
         console.log(`  ${OOO_PREFIX}${t.summary}  ${t.startDate} → ${t.endDate}`);
       }
     } else if (futureTrips.length > 0) {
-      console.log('\n  OOO blocks: skipped (Google Calendar credentials not configured)');
+      console.log(`\n  OOO blocks: skipped (${oooSkipReason(googleCreds)})`);
     }
 
     if (jsonOutput) _log(JSON.stringify(result));
@@ -253,17 +275,32 @@ try {
 
   // Step 5: OOO calendar blocks
   let oooStats = null;
-  const gcal = createGCalClient({
-    clientId: GOOGLE_CLIENT_ID,
-    clientSecret: GOOGLE_CLIENT_SECRET,
-    refreshToken: GOOGLE_REFRESH_TOKEN,
-  });
 
   if (!gcal) {
-    console.log('\n  OOO blocks: skipped (Google Calendar credentials not configured)');
+    console.log(`\n  OOO blocks: skipped (${oooSkipReason(googleCreds)})`);
   } else {
     console.log('\n── OOO Calendar Blocks ──');
-    oooStats = await syncOooEvents(client, gcal, futureTrips);
+    try {
+      oooStats = await syncOooEvents(client, gcal, futureTrips);
+    } catch (err) {
+      // Surface OneCLI Google-connection misconfig clearly (gateway 401
+      // when the built-in Google Calendar connection isn't authorized).
+      // Don't assume `err` is an Error — libraries sometimes throw strings
+      // or plain objects; always rethrow Error so the top-level catch gets
+      // a real message, and preserve the original via `cause`.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (process.env.ONECLI_URL && /401|unauthorized|invalid.?credential/i.test(msg)) {
+        throw new Error(
+          `Google Calendar OOO failed under OneCLI (${msg}). ` +
+          'Configure and authorize the OneCLI Google Calendar connection ' +
+          '(`onecli apps configure`) so the gateway can inject a real Bearer, ' +
+          'or set ENABLE_OOO=0 to skip OOO.',
+          { cause: err },
+        );
+      }
+      if (err instanceof Error) throw err;
+      throw new Error(msg, { cause: err });
+    }
     result.ooo = {
       created: oooStats.created,
       deleted: oooStats.deleted,
@@ -282,12 +319,13 @@ try {
   console.log('\nSync complete!');
   if (jsonOutput) _log(JSON.stringify(result));
 } catch (err) {
+  const fatalMsg = err instanceof Error ? err.message : String(err);
   if (jsonOutput) {
-    result.errors.push(err.message);
+    result.errors.push(fatalMsg);
     _log(JSON.stringify(result));
   }
-  _error(`\nFATAL ERROR: ${err.message}`);
-  _error(err.stack);
+  _error(`\nFATAL ERROR: ${fatalMsg}`);
+  if (err instanceof Error && err.stack) _error(err.stack);
   process.exit(1);
 }
 

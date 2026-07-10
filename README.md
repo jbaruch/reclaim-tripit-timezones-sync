@@ -213,6 +213,33 @@ TRIPIT_IGNORE_KEYWORDS=alice,daniel,nicole
 
 Ignored trips are excluded from both timezone segments and OOO calendar blocks. Their flights and lodging data won't leak into other trips' segments.
 
+## OneCLI / credential-gateway mode (optional)
+
+When the sync is launched under [OneCLI](https://github.com/onecli/onecli) (`onecli run node sync.mjs`), real TripIt / Reclaim / Google credentials can live in the OneCLI vault instead of the process environment. The sync sends **placeholder** values; the gateway MITM-swaps them on the outbound request.
+
+**Everything here is opt-in and gated on `ONECLI_URL`.** When `ONECLI_URL` is unset, HTTP routing matches a normal run — no ProxyAgent, no dispatcher swap, OAuth refresh for Google as before. (The `undici` package is still a declared dependency and may load if something imports `lib/proxy.mjs`.)
+
+```bash
+# onecli run injects ONECLI_URL, HTTPS_PROXY, and NODE_EXTRA_CA_CERTS
+onecli run node sync.mjs sync
+```
+
+| Credential | Host | Gateway injection | Placeholder the sync sends |
+|---|---|---|---|
+| TripIt iCal | `www.tripit.com` | URL **path** segment | `…/feed/ical/private/<placeholder>/tripit.ics` |
+| Reclaim | `api.app.reclaim.ai` | `Authorization: Bearer` header | `Bearer <placeholder>` |
+| Google Calendar | `www.googleapis.com` | `Authorization: Bearer` header (OneCLI Google connection) | `Bearer onecli-managed` |
+
+### What changes under OneCLI
+
+1. **Proxy + CA** — `lib/proxy.mjs` installs an undici `ProxyAgent` so global `fetch` (Reclaim, TripIt iCal, Telegram) routes through `HTTPS_PROXY`. Node trusts the MITM CA via `NODE_EXTRA_CA_CERTS` (set by `onecli run`). If `ONECLI_URL` is set but `HTTPS_PROXY` is not, the process fails fast with an actionable error.
+2. **TripIt** — the iCal feed is pulled with global `fetch` (not node-ical's internal client) so the request hits the gateway.
+3. **Google Calendar** — no client-side OAuth refresh. googleapis is given a static access token so it never POSTs `oauth2.googleapis.com/token`. The gateway's built-in Google Calendar connection injects a real Bearer on `www.googleapis.com`. **Prerequisite:** configure that connection once (`onecli apps configure` with your Google `client_id`/`secret`) and authorize it so the gateway has a token to inject. Otherwise Calendar calls 401.
+4. **OOO opt-in** — Google env vars are ignored for auth in OneCLI mode. Enable OOO with `ENABLE_OOO=1` (or keep the three `GOOGLE_*` placeholders present as a convenience marker). `ENABLE_OOO=0` forces OOO off.
+5. **Telegram** — also routes through the proxy automatically. To use notify under OneCLI you need a gateway vault entry for `api.telegram.org` with path injection for the bot token; otherwise pass a real token or leave notify disabled (NanoClaw uses `--output=json`, which already skips notify).
+
+SNS / AWS SigV4 is out of scope for gateway injection and is unchanged.
+
 ## Telegram notifications (optional)
 
 Get notified when timezone overrides change. To set up:
@@ -227,16 +254,20 @@ When configured, you'll receive a message listing the new timezone overrides whe
 
 | Variable | Required | Description |
 |---|---|---|
-| `TRIPIT_ICAL_URL` | Yes | Your private TripIt iCal feed URL |
-| `RECLAIM_API_TOKEN` | Yes | Reclaim.ai API token |
+| `TRIPIT_ICAL_URL` | Yes | Your private TripIt iCal feed URL (placeholder path token OK under OneCLI) |
+| `RECLAIM_API_TOKEN` | Yes | Reclaim.ai API token (placeholder OK under OneCLI) |
 | `HOME_TZ` | No | Your home timezone (IANA, e.g. `America/Chicago`). Segments in this timezone are skipped as redundant home→home overrides. Defaults to Reclaim's account timezone when readable |
 | `TELEGRAM_BOT_TOKEN` | No | Telegram bot token for change notifications |
 | `TELEGRAM_CHAT_ID` | No | Telegram chat ID to send notifications to |
-| `GOOGLE_CLIENT_ID` | No | Google OAuth2 client ID (enables OOO blocks) |
+| `GOOGLE_CLIENT_ID` | No | Google OAuth2 client ID (enables OOO blocks; ignored for auth under OneCLI) |
 | `GOOGLE_CLIENT_SECRET` | No | Google OAuth2 client secret |
 | `GOOGLE_REFRESH_TOKEN` | No | Google OAuth2 refresh token |
 | `TRIPIT_IGNORE_TRIPS` | No | Comma-separated trip names to ignore (case-insensitive substring match) |
 | `TRIPIT_IGNORE_KEYWORDS` | No | Comma-separated keywords — any trip whose name contains one matches |
+| `ONECLI_URL` | No | Set by `onecli run`. Gates proxy routing + placeholder-credential mode. Do not set by hand unless you also provide `HTTPS_PROXY` |
+| `HTTPS_PROXY` | No* | Gateway proxy URL. Required when `ONECLI_URL` is set (injected by `onecli run`) |
+| `NODE_EXTRA_CA_CERTS` | No | Path to the OneCLI MITM CA. Injected by `onecli run`; Node trusts it at process start |
+| `ENABLE_OOO` | No | OneCLI only: `1`/`true` enables OOO without Google env vars; `0`/`false` disables OOO even if placeholders are present |
 
 ## Releasing a new version
 

@@ -3,6 +3,9 @@
   "version": "2.0.0",
   "type": "module",
   "description": "Sync travel timezones from TripIt iCal feed to Reclaim.ai REST API",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "scripts": {
     "dry-run": "node sync.mjs dry-run",
     "sync": "node sync.mjs sync",
@@ -11,7 +14,8 @@
   "dependencies": {
     "geo-tz": "^8.1.1",
     "googleapis": "^171.4.0",
-    "node-ical": "^0.20.1"
+    "node-ical": "^0.20.1",
+    "undici": "^8.7.0"
   },
   "optionalDependencies": {
     "@aws-sdk/client-sns": "^3.1004.0"

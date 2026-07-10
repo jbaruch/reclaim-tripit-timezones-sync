@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Optional OneCLI / MITM credential-gateway mode, gated on `ONECLI_URL`.
+  When set (via `onecli run`), outbound HTTP routes through `HTTPS_PROXY`,
+  TripIt iCal is fetched via proxied global `fetch`, Google Calendar uses a
+  static placeholder Bearer with no client-side OAuth refresh, and placeholder
+  TripIt/Reclaim credentials are accepted for gateway injection. No behavior
+  change when `ONECLI_URL` is unset. Adds `undici` dependency and `lib/proxy.mjs`.
+
 ## 0.3.3 — 2026-06-18
 
 - Onboarding skill is now autonomous-first: it resolves the credentials
