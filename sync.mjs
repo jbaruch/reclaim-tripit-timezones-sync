@@ -1,3 +1,9 @@
+// Install undici ProxyAgent before any HTTP when running under OneCLI
+// (`ONECLI_URL` set by `onecli run`). No-op otherwise — keeps non-OneCLI
+// behavior byte-for-byte identical. Must be the first side-effect import.
+import { installProxyDispatcher } from './lib/proxy.mjs';
+installProxyDispatcher();
+
 import {
   fetchIcalEvents,
   extractTrips,
@@ -193,10 +199,19 @@ try {
   // Get future trips for OOO sync
   const futureTrips = filterFutureTrips(trips);
 
+  // Google Calendar client (null when OOO not configured / not opted in).
+  // In OneCLI mode the gateway injects Google auth; createGCalClient ignores
+  // the real OAuth values and sends a static placeholder Bearer instead.
+  const gcal = createGCalClient({
+    clientId: GOOGLE_CLIENT_ID,
+    clientSecret: GOOGLE_CLIENT_SECRET,
+    refreshToken: GOOGLE_REFRESH_TOKEN,
+  });
+
   if (mode === 'dry-run') {
     console.log('\nDry run complete. No changes made to Reclaim.');
 
-    if (futureTrips.length > 0 && GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
+    if (futureTrips.length > 0 && gcal) {
       console.log(`\n── OOO blocks (would create) ──`);
       for (const t of futureTrips) {
         console.log(`  ${OOO_PREFIX}${t.summary}  ${t.startDate} → ${t.endDate}`);
@@ -253,17 +268,26 @@ try {
 
   // Step 5: OOO calendar blocks
   let oooStats = null;
-  const gcal = createGCalClient({
-    clientId: GOOGLE_CLIENT_ID,
-    clientSecret: GOOGLE_CLIENT_SECRET,
-    refreshToken: GOOGLE_REFRESH_TOKEN,
-  });
 
   if (!gcal) {
     console.log('\n  OOO blocks: skipped (Google Calendar credentials not configured)');
   } else {
     console.log('\n── OOO Calendar Blocks ──');
-    oooStats = await syncOooEvents(client, gcal, futureTrips);
+    try {
+      oooStats = await syncOooEvents(client, gcal, futureTrips);
+    } catch (err) {
+      // Surface OneCLI Google-connection misconfig clearly (gateway 401
+      // when the built-in Google Calendar connection isn't authorized).
+      if (process.env.ONECLI_URL && /401|unauthorized|invalid.?credential/i.test(err.message)) {
+        throw new Error(
+          `Google Calendar OOO failed under OneCLI (${err.message}). ` +
+          'Configure and authorize the OneCLI Google Calendar connection ' +
+          '(`onecli apps configure`) so the gateway can inject a real Bearer, ' +
+          'or set ENABLE_OOO=0 to skip OOO.',
+        );
+      }
+      throw err;
+    }
     result.ooo = {
       created: oooStats.created,
       deleted: oooStats.deleted,

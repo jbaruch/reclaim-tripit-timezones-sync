@@ -11,7 +11,8 @@
   "dependencies": {
     "geo-tz": "^8.1.1",
     "googleapis": "^171.4.0",
-    "node-ical": "^0.20.1"
+    "node-ical": "^0.20.1",
+    "undici": "^8.7.0"
   },
   "optionalDependencies": {
     "@aws-sdk/client-sns": "^3.1004.0"
