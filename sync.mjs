@@ -34,6 +34,7 @@ import {
 
 import {
   createGCalClient,
+  oooSkipReason,
   listOooEvents,
   createOooEvent,
   deleteOooEvent,
@@ -206,11 +207,12 @@ try {
   // Google Calendar client (null when OOO not configured / not opted in).
   // In OneCLI mode the gateway injects Google auth; createGCalClient ignores
   // the real OAuth values and sends a static placeholder Bearer instead.
-  const gcal = createGCalClient({
+  const googleCreds = {
     clientId: GOOGLE_CLIENT_ID,
     clientSecret: GOOGLE_CLIENT_SECRET,
     refreshToken: GOOGLE_REFRESH_TOKEN,
-  });
+  };
+  const gcal = createGCalClient(googleCreds);
 
   if (mode === 'dry-run') {
     console.log('\nDry run complete. No changes made to Reclaim.');
@@ -221,7 +223,7 @@ try {
         console.log(`  ${OOO_PREFIX}${t.summary}  ${t.startDate} → ${t.endDate}`);
       }
     } else if (futureTrips.length > 0) {
-      console.log('\n  OOO blocks: skipped (Google Calendar credentials not configured)');
+      console.log(`\n  OOO blocks: skipped (${oooSkipReason(googleCreds)})`);
     }
 
     if (jsonOutput) _log(JSON.stringify(result));
@@ -274,7 +276,7 @@ try {
   let oooStats = null;
 
   if (!gcal) {
-    console.log('\n  OOO blocks: skipped (Google Calendar credentials not configured)');
+    console.log(`\n  OOO blocks: skipped (${oooSkipReason(googleCreds)})`);
   } else {
     console.log('\n── OOO Calendar Blocks ──');
     try {
