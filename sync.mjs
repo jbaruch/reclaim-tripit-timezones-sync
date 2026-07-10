@@ -1,15 +1,7 @@
-// OneCLI mode: install undici ProxyAgent before any HTTP.
-// ESM evaluates all static imports (the whole dependency graph) before this
-// module body runs, so import order does NOT control when the agent is
-// installed — the explicit call below does. That is safe because lib/*
-// only export functions; they do not perform HTTP at load time. Any future
-// top-level HTTP in an imported module would race this and break OneCLI.
-// When ONECLI_URL is unset, installProxyDispatcher() is a no-op: no ProxyAgent,
-// no dispatcher swap, HTTP behavior unchanged. Note: importing this module
-// still loads `undici` (a declared dependency); the no-op is about runtime
-// HTTP routing, not zero module-graph difference.
+// OneCLI proxy install is deferred until after CLI/output parsing (see
+// installProxyDispatcher() inside the main try). Importing here loads undici
+// but does not install a dispatcher until the explicit call.
 import { installProxyDispatcher } from './lib/proxy.mjs';
-installProxyDispatcher();
 
 import {
   fetchIcalEvents,
@@ -120,6 +112,12 @@ console.log(`\n=== TripIt → Reclaim Travel Timezone Sync ===`);
 console.log(`Mode: ${mode}\n`);
 
 try {
+  // OneCLI: install undici ProxyAgent before any HTTP. Runs inside try so
+  // missing HTTPS_PROXY (etc.) exits through the same fatal path as other
+  // errors — including --output=json shaping. No-op when ONECLI_URL unset.
+  // Safe here because lib/* only export functions; they do not HTTP at load.
+  installProxyDispatcher();
+
   // Step 1: Fetch and parse iCal feed
   const events = await fetchIcalEvents(TRIPIT_ICAL_URL);
   const allTrips = extractTrips(events);
