@@ -281,7 +281,7 @@ try {
   } else {
     console.log('\n── OOO Calendar Blocks ──');
     try {
-      oooStats = await syncOooEvents(client, gcal, futureTrips);
+      oooStats = await syncOooEvents(client, gcal, futureTrips, homeTz);
     } catch (err) {
       // Surface OneCLI Google-connection misconfig clearly (gateway 401
       // when the built-in Google Calendar connection isn't authorized).
@@ -332,7 +332,7 @@ try {
 /**
  * Sync OOO events: create missing, delete stale, set Reclaim priority to P2.
  */
-async function syncOooEvents(reclaimClient, gcal, futureTrips) {
+async function syncOooEvents(reclaimClient, gcal, futureTrips, homeTz) {
   const stats = { created: 0, deleted: 0, prioritySet: 0, createdNames: [], deletedNames: [] };
 
   // Get Reclaim primary calendar for the Google Calendar ID and Reclaim calendar ID
@@ -344,7 +344,7 @@ async function syncOooEvents(reclaimClient, gcal, futureTrips) {
   console.log(`  Reclaim calendar: ${calendarId}, Google Calendar: ${googleCalendarId}`);
 
   // List existing OOO events in Google Calendar
-  const existingOoo = await listOooEvents(gcal, googleCalendarId);
+  const existingOoo = await listOooEvents(gcal, googleCalendarId, homeTz);
   console.log(`  Existing OOO events: ${existingOoo.length}`);
 
   // Build a map of desired OOO events keyed by trip summary
@@ -382,6 +382,7 @@ async function syncOooEvents(reclaimClient, gcal, futureTrips) {
       summary: name,
       startDate: trip.startDate,
       endDate: trip.endDate,
+      timeZone: homeTz,
     });
     createdEventIds.push(eventId);
     stats.created++;

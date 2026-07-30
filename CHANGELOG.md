@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- OOO calendar blocks are now anchored at **home-local midnight** instead of
+  UTC midnight. A UTC-midnight block renders as the evening before in a
+  behind-UTC home zone (00:00Z shows as 19:00 the prior day in
+  `America/Chicago`); `createOooEvent` now emits a zone-naive `T00:00:00` plus
+  the home `timeZone` (resolved via `resolveHomeTimezone`), falling back to UTC
+  midnight only when no home tz is known. `listOooEvents` resolves each existing
+  block's date in the home tz, so legacy UTC-midnight blocks are seen as changed
+  and migrated to home midnight on the next sync.
 - Optional OneCLI / MITM credential-gateway mode, gated on `ONECLI_URL`.
   When set (via `onecli run`), outbound HTTP routes through `HTTPS_PROXY`,
   TripIt iCal is fetched via proxied global `fetch`, Google Calendar uses a
