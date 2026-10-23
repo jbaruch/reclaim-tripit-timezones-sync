@@ -29,7 +29,7 @@ AWS_DEPLOYMENT.md
 
 # Repo infra (not plugin content)
 .github/
-scripts/
+/scripts/
 .claude/
 
 # Runtime installer fixtures run in CI, not in the installed skill.

@@ -162,7 +162,6 @@ describe('shipped sync installer and runner', () => {
     'obsolete library',
     'malformed marker',
     'old schema',
-    'new schema',
     'wrong release'
   ]) {
     it(`repairs ${damage} instead of reporting a ready runtime`, (t) => {
@@ -180,7 +179,6 @@ describe('shipped sync installer and runner', () => {
       else {
         const state = JSON.parse(readFileSync(marker, 'utf8'));
         if (damage === 'old schema') state.schema_version = 0;
-        if (damage === 'new schema') state.schema_version = 2;
         if (damage === 'wrong release') state.requestedVersion = '0.0.1';
         writeFileSync(marker, JSON.stringify(state));
       }
@@ -196,6 +194,33 @@ describe('shipped sync installer and runner', () => {
       assert.equal(JSON.parse(present.stdout).status, 'present');
     });
   }
+
+  it('preserves a newer runtime schema and refuses both reinstall and sealing', (t) => {
+    const f = fixture(t);
+    const installed = spawnSync('bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+    assert.equal(installed.status, 0, installed.stderr);
+    const marker = join(f.destination, '.sync-runtime.json');
+    const state = JSON.parse(readFileSync(marker, 'utf8'));
+    state.schema_version = 2;
+    writeFileSync(marker, JSON.stringify(state));
+    const before = readFileSync(marker, 'utf8');
+    const mainBefore = readFileSync(join(f.destination, 'sync.mjs'), 'utf8');
+    const reused = spawnSync('bash', [installer, f.destination], {
+      env: { ...f.env, FIXTURE_FAIL_DOWNLOAD: '1' },
+      encoding: 'utf8'
+    });
+    assert.equal(reused.status, 4, reused.stderr);
+    assert.equal(reused.stdout, '');
+    assert.match(reused.stderr, /Update the reclaim-tripit-sync plugin/);
+    assert.doesNotMatch(reused.stderr, /Fixture download failed/);
+    const sealed = spawnSync(process.execPath, [runtimeState, 'seal', f.destination, installedVersion], {
+      encoding: 'utf8'
+    });
+    assert.equal(sealed.status, 4, sealed.stderr);
+    assert.equal(JSON.parse(sealed.stdout).error, 'newer-runtime-schema');
+    assert.equal(readFileSync(marker, 'utf8'), before);
+    assert.equal(readFileSync(join(f.destination, 'sync.mjs'), 'utf8'), mainBefore);
+  });
 
   it('propagates unexpected verifier failures instead of repairing the runtime', (t) => {
     const f = fixture(t);
