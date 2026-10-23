@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // OneCLI proxy install is deferred until after CLI/output parsing (see
@@ -510,7 +510,11 @@ export async function main(argv = process.argv.slice(2), overrides = {}) {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (
+  process.argv[1] &&
+  fs.existsSync(process.argv[1]) &&
+  fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))
+) {
   const status = await main();
   // Flush the complete JSON/error payload before terminating any idle HTTP agents.
   process.stdout.write('', () => process.stderr.write('', () => process.exit(status)));

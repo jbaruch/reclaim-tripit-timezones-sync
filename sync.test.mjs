@@ -1,6 +1,9 @@
 import { beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, symlinkSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { main } from './sync.mjs';
 import ical from 'node-ical';
@@ -122,6 +125,21 @@ describe('CLI orchestration outcomes', () => {
   it('flushes JSON and returns failure when executed with missing configuration', () => {
     const executed = spawnSync(process.execPath, ['sync.mjs', 'sync', '--output=json'], {
       cwd: fileURLToPath(new URL('.', import.meta.url)),
+      env: { ...process.env, TRIPIT_ICAL_URL: '', RECLAIM_API_TOKEN: '' },
+      encoding: 'utf8',
+      timeout: 10000
+    });
+    assert.equal(executed.status, 1);
+    assert.deepEqual(JSON.parse(executed.stdout).errors, ['Missing TRIPIT_ICAL_URL environment variable']);
+    assert.match(executed.stderr, /Missing TRIPIT_ICAL_URL/);
+  });
+
+  it('executes through a symlink instead of silently exiting successfully', (t) => {
+    const temporary = mkdtempSync(join(tmpdir(), 'sync-entrypoint-'));
+    t.after(() => rmSync(temporary, { recursive: true, force: true }));
+    const entry = join(temporary, 'sync.mjs');
+    symlinkSync(fileURLToPath(new URL('./sync.mjs', import.meta.url)), entry);
+    const executed = spawnSync(process.execPath, [entry, 'sync', '--output=json'], {
       env: { ...process.env, TRIPIT_ICAL_URL: '', RECLAIM_API_TOKEN: '' },
       encoding: 'utf8',
       timeout: 10000

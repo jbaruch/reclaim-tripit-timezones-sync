@@ -4,6 +4,8 @@
 
 - Gate runtime changes with pinned formatting, lint, JavaScript diagnostics and
   outcome tests. Package only plugin content, and publish packaging changes.
+- Delegate sync installation and execution to guarded, tested scripts. Keep
+  operator configuration and expose a new runtime only after its dependencies install.
 
 - OOO calendar blocks are now anchored at **home-local midnight** instead of
   UTC midnight. A UTC-midnight block renders as the evening before in a

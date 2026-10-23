@@ -62,6 +62,28 @@ echo 'Fixture npm progress' >&2
 }
 
 describe('shipped sync installer and runner', () => {
+  it('runs both declared plugin-mount commands from a consumer workspace', (t) => {
+    const f = fixture(t);
+    const workspace = join(f.root, 'consumer');
+    const relative = '.tessl/plugins/jbaruch/reclaim-tripit-sync/skills/sync-tripit/scripts';
+    mkdirSync(join(workspace, relative), { recursive: true });
+    writeFileSync(join(workspace, relative, 'install-sync.sh'), readFileSync(installer));
+    writeFileSync(join(workspace, relative, 'run-sync.sh'), readFileSync(runner));
+    const installed = spawnSync('bash', [`${relative}/install-sync.sh`, f.destination], {
+      cwd: workspace,
+      env: f.env,
+      encoding: 'utf8'
+    });
+    assert.equal(installed.status, 0, installed.stderr);
+    assert.equal(JSON.parse(installed.stdout).status, 'installed');
+    const run = spawnSync('bash', [`${relative}/run-sync.sh`, f.destination], {
+      cwd: workspace,
+      env: f.env,
+      encoding: 'utf8'
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).mode, 'sync');
+  });
   it('installs a complete runtime, preserves configuration, and emits JSON only', (t) => {
     const f = fixture(t);
     writeFileSync(join(f.destination, '.env'), 'FIXTURE_VALUE=operator-file\n');
@@ -143,24 +165,78 @@ describe('shipped sync installer and runner', () => {
   }
 });
 
+/** @param {import('node:test').TestContext} t */
+function releaseFixture(t) {
+  const f = fixture(t);
+  const root = join(f.root, 'release-repo');
+  const paths = [
+    'scripts',
+    '.tessl-plugin',
+    'skills/sync-tripit/scripts',
+    'evals/sync-library-installation-and-execution'
+  ];
+  for (const name of paths) mkdirSync(join(root, name), { recursive: true });
+  const script = join(root, 'scripts/bump-version.sh');
+  writeFileSync(script, readFileSync(new URL('../../../scripts/bump-version.sh', import.meta.url)));
+  writeFileSync(
+    join(root, 'scripts/bump-version.mjs'),
+    readFileSync(new URL('../../../scripts/bump-version.mjs', import.meta.url))
+  );
+  writeFileSync(join(root, '.tessl-plugin/plugin.json'), '{"name":"fixture/plugin","version":"0.3.4"}\n');
+  writeFileSync(join(root, 'skills/sync-tripit/scripts/install-sync.sh'), readFileSync(installer));
+  const url = 'https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.3.4.tar.gz';
+  writeFileSync(join(root, 'evals/sync-library-installation-and-execution/criteria.json'), JSON.stringify({ url }));
+  writeFileSync(join(root, 'research.md'), `Example version 0.3.0\n${url}\n`);
+  return { ...f, releaseRoot: root, script, url };
+}
+
 describe('release version synchronization', () => {
-  it('updates the moved installer pin and archive references from any working directory', (t) => {
+  for (const damaged of [
+    'skills/sync-tripit/scripts/install-sync.sh',
+    'evals/sync-library-installation-and-execution/criteria.json',
+    'research.md',
+    'duplicate installer pin'
+  ]) {
+    it(`fails without changing any source when ${damaged} has no unique expected pattern`, (t) => {
+      const f = releaseFixture(t);
+      const files = [
+        '.tessl-plugin/plugin.json',
+        'skills/sync-tripit/scripts/install-sync.sh',
+        'evals/sync-library-installation-and-execution/criteria.json',
+        'research.md'
+      ];
+      if (damaged === 'duplicate installer pin') {
+        const file = join(f.releaseRoot, files[1]);
+        writeFileSync(file, readFileSync(file, 'utf8') + "\nlocal version='0.3.4'\n");
+      } else {
+        writeFileSync(join(f.releaseRoot, damaged), 'Expected release pattern removed\n');
+      }
+      const before = files.map((file) => readFileSync(join(f.releaseRoot, file), 'utf8'));
+      const run = spawnSync('bash', [f.script, '4.5.6'], { cwd: f.root, encoding: 'utf8' });
+      assert.equal(run.status, 1);
+      assert.equal(run.stdout, '');
+      assert.match(run.stderr, /Restore.*then retry the release bump/);
+      assert.deepEqual(
+        files.map((file) => readFileSync(join(f.releaseRoot, file), 'utf8')),
+        before
+      );
+    });
+  }
+
+  it('imports the version synchronizer without parsing arguments or writing files', (t) => {
     const f = fixture(t);
-    const root = join(f.root, 'release-repo');
-    const paths = [
-      'scripts',
-      '.tessl-plugin',
-      'skills/sync-tripit/scripts',
-      'evals/sync-library-installation-and-execution'
-    ];
-    for (const name of paths) mkdirSync(join(root, name), { recursive: true });
-    const script = join(root, 'scripts/bump-version.sh');
-    writeFileSync(script, readFileSync(new URL('../../../scripts/bump-version.sh', import.meta.url)));
-    writeFileSync(join(root, '.tessl-plugin/plugin.json'), '{"name":"fixture/plugin","version":"0.3.4"}\n');
-    writeFileSync(join(root, 'skills/sync-tripit/scripts/install-sync.sh'), readFileSync(installer));
-    const url = 'https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.3.4.tar.gz';
-    writeFileSync(join(root, 'evals/sync-library-installation-and-execution/criteria.json'), JSON.stringify({ url }));
-    writeFileSync(join(root, 'research.md'), `Example version 0.3.0\n${url}\n`);
+    const url = new URL('../../../scripts/bump-version.mjs', import.meta.url).href;
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(url)})`], {
+      cwd: f.root,
+      encoding: 'utf8'
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(run.stdout, '');
+    assert.equal(run.stderr, '');
+  });
+  it('updates the moved installer pin and archive references from any working directory', (t) => {
+    const f = releaseFixture(t);
+    const { releaseRoot: root, script, url } = f;
     const invalid = spawnSync('bash', [script, '4.5'], { cwd: f.root, encoding: 'utf8' });
     assert.equal(invalid.status, 2);
     assert.equal(JSON.parse(readFileSync(join(root, '.tessl-plugin/plugin.json'), 'utf8')).version, '0.3.4');
