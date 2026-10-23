@@ -20,9 +20,9 @@ bash .tessl/plugins/jbaruch/reclaim-tripit-sync/skills/sync-tripit/scripts/insta
 ```
 
 Optional input: one installation directory, default `$HOME/.tripit-reclaim`.
-The installer preserves an existing runtime and `.env`. On exit 0, stdout is one
+The installer reuses a verified runtime of the requested version, repairs incomplete
+installations, upgrades other versions, and preserves `.env`. On exit 0, stdout is one
 JSON object with `status` (`installed` or `present`), `path`, and `requestedVersion`.
-The requested version is not a claim about a previously installed runtime.
 On a nonzero exit, report its stderr diagnostic and stop; no usable new
 `sync.mjs` is published after a failed download or dependency installation.
 

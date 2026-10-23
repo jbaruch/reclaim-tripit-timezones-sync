@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Install the pinned sync runtime if sync.mjs is absent.
+# Install or repair the pinned runtime; reuse a verified complete installation.
 # Usage: bash install-sync.sh [installation-directory]
-# Default directory: $HOME/.tripit-reclaim. Existing runtimes and .env are kept.
+# Default directory: $HOME/.tripit-reclaim. Operator-owned .env is kept.
 # Stdout: one JSON object {status: installed|present, path, requestedVersion}.
 # Exit 0: ready; 2: bad arguments; other nonzero: download/extract/install failed.
-# Dependencies: bash, curl, tar, npm, node. No credentials are read or printed.
+# Dependencies: bash, node; curl, tar, npm only for installation/repair.
+# No credentials are read or printed.
 set -euo pipefail
 
 install_sync_main() (
@@ -14,17 +15,26 @@ install_sync_main() (
   fi
   local install_dir="${1:-$HOME/.tripit-reclaim}"
   local version='0.3.5'
+  if ! command -v node >/dev/null; then
+    echo 'Install node and retry install-sync.sh.' >&2
+    return 1
+  fi
+  local script_dir="${BASH_SOURCE[0]%/*}"
+  if [[ "$script_dir" == "${BASH_SOURCE[0]}" ]]; then script_dir='.'; fi
+  if node "$script_dir/runtime-state.mjs" check "$install_dir" "$version"; then
+    node -e 'console.log(JSON.stringify({status:"present",path:process.argv[1],requestedVersion:process.argv[2]}))' "$install_dir" "$version"
+    return 0
+  else
+    local readiness_status=$?
+    if (( readiness_status != 1 )); then return "$readiness_status"; fi
+  fi
   local tool
-  for tool in curl tar npm node; do
+  for tool in curl tar npm; do
     if ! command -v "$tool" >/dev/null; then
       echo "Install $tool and retry install-sync.sh." >&2
       return 1
     fi
   done
-  if [[ -f "$install_dir/sync.mjs" ]]; then
-    node -e 'console.log(JSON.stringify({status:"present",path:process.argv[1],requestedVersion:process.argv[2]}))' "$install_dir" "$version"
-    return 0
-  fi
 
   local staging
   staging=$(mktemp -d)
@@ -48,14 +58,18 @@ install_sync_main() (
     return 1
   fi
   (cd "$staging/runtime" && npm ci --omit=dev >&2)
+  node "$script_dir/runtime-state.mjs" seal "$staging/runtime" "$version"
   # Publish sync.mjs last: an interrupted copy must not look like a ready install.
   mv "$staging/runtime/sync.mjs" "$staging/sync.mjs"
   mkdir -p -- "$install_dir"
+  # Replace owned trees so removed files from an older release cannot survive.
+  rm -rf -- "${install_dir:?}/lib" "${install_dir:?}/node_modules"
   cp -R "$staging/runtime/." "$install_dir/"
   pending_main=$(mktemp "$install_dir/.sync-main.XXXXXX")
   cp "$staging/sync.mjs" "$pending_main"
   mv "$pending_main" "$install_dir/sync.mjs"
   pending_main=''
+  node "$script_dir/runtime-state.mjs" check "$install_dir" "$version"
   node -e 'console.log(JSON.stringify({status:"installed",path:process.argv[1],requestedVersion:process.argv[2]}))' "$install_dir" "$version"
 )
 
