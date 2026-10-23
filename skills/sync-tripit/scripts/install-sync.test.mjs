@@ -1,13 +1,17 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, parse } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const installer = fileURLToPath(new URL('install-sync.sh', import.meta.url));
 const runner = fileURLToPath(new URL('run-sync.sh', import.meta.url));
+const runtimeState = fileURLToPath(new URL('runtime-state.mjs', import.meta.url));
+const installedVersion = JSON.parse(
+  readFileSync(new URL('../../../.tessl-plugin/plugin.json', import.meta.url), 'utf8')
+).version;
 
 /** @param {import('node:test').TestContext} t */
 function fixture(t) {
@@ -22,8 +26,13 @@ function fixture(t) {
     join(runtime, 'sync.mjs'),
     'console.log(JSON.stringify({mode:process.argv[2], output:process.argv[3],fixture:process.env.FIXTURE_VALUE}));\n'
   );
-  writeFileSync(join(runtime, 'package.json'), '{"name":"fixture","version":"1.0.0"}\n');
+  writeFileSync(
+    join(runtime, 'package.json'),
+    '{"name":"fixture","version":"1.0.0","dependencies":{"fixture-dep":"1.0.0"}}\n'
+  );
   writeFileSync(join(runtime, 'package-lock.json'), '{}\n');
+  mkdirSync(join(runtime, 'lib'));
+  writeFileSync(join(runtime, 'lib/helper.mjs'), 'export const ready = true;\n');
   const archive = join(root, 'runtime.tar.gz');
   const packed = spawnSync('tar', ['czf', archive, '-C', payload, 'runtime'], { encoding: 'utf8' });
   assert.equal(packed.status, 0, packed.stderr);
@@ -36,7 +45,7 @@ if [ "\${FIXTURE_FAIL_DOWNLOAD:-0}" = 1 ]; then
   exit 22
 fi
 case "$2" in
-  https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.3.4.tar.gz) ;;
+  https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v${installedVersion}.tar.gz) ;;
   *) echo 'Unexpected archive URL' >&2; exit 2 ;;
 esac
 cp "$FIXTURE_ARCHIVE" "$4"
@@ -51,7 +60,10 @@ if [ "\${FIXTURE_FAIL_NPM:-0}" = 1 ]; then
   echo 'Fixture npm install failed; retry later.' >&2
   exit 9
 fi
-mkdir -p node_modules
+mkdir -p node_modules/fixture-dep
+echo '{"packages":{"node_modules/fixture-dep":{"version":"1.0.0"}}}' > node_modules/.package-lock.json
+echo '{"name":"fixture-dep","version":"1.0.0","main":"index.js"}' > node_modules/fixture-dep/package.json
+echo 'module.exports = {};' > node_modules/fixture-dep/index.js
 echo ready > node_modules/fixture-ready
 echo 'Fixture npm progress' >&2
 `,
@@ -69,6 +81,7 @@ describe('shipped sync installer and runner', () => {
     mkdirSync(join(workspace, relative), { recursive: true });
     writeFileSync(join(workspace, relative, 'install-sync.sh'), readFileSync(installer));
     writeFileSync(join(workspace, relative, 'run-sync.sh'), readFileSync(runner));
+    writeFileSync(join(workspace, relative, 'runtime-state.mjs'), readFileSync(runtimeState));
     const installed = spawnSync('bash', [`${relative}/install-sync.sh`, f.destination], {
       cwd: workspace,
       env: f.env,
@@ -92,7 +105,7 @@ describe('shipped sync installer and runner', () => {
     assert.deepEqual(JSON.parse(installed.stdout), {
       status: 'installed',
       path: f.destination,
-      requestedVersion: '0.3.4'
+      requestedVersion: installedVersion
     });
     assert.equal(readFileSync(join(f.destination, '.env'), 'utf8'), 'FIXTURE_VALUE=operator-file\n');
     assert.ok(existsSync(join(f.destination, 'node_modules/fixture-ready')));
@@ -102,16 +115,107 @@ describe('shipped sync installer and runner', () => {
     assert.deepEqual(JSON.parse(run.stdout), { mode: 'sync', output: '--output=json', fixture: 'operator-file' });
   });
 
-  it('keeps an existing runtime without downloading or claiming its version', (t) => {
+  it('reuses a complete runtime with only Node available and no installer tools', (t) => {
     const f = fixture(t);
-    writeFileSync(join(f.destination, 'sync.mjs'), '// Existing runtime\n');
-    const run = spawnSync('bash', [installer, f.destination], {
-      env: { ...f.env, FIXTURE_FAIL_DOWNLOAD: '1' },
+    const installed = spawnSync('bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+    assert.equal(installed.status, 0, installed.stderr);
+    const onlyNode = join(f.root, 'node-only');
+    mkdirSync(onlyNode);
+    symlinkSync(process.execPath, join(onlyNode, 'node'));
+    const before = readFileSync(join(f.destination, 'sync.mjs'), 'utf8');
+    const run = spawnSync('/bin/bash', [installer, f.destination], {
+      env: { ...f.env, PATH: onlyNode, FIXTURE_FAIL_DOWNLOAD: '1' },
       encoding: 'utf8'
     });
     assert.equal(run.status, 0, run.stderr);
     assert.equal(JSON.parse(run.stdout).status, 'present');
-    assert.equal(readFileSync(join(f.destination, 'sync.mjs'), 'utf8'), '// Existing runtime\n');
+    assert.equal(readFileSync(join(f.destination, 'sync.mjs'), 'utf8'), before);
+  });
+
+  it('repairs a legacy partial installation and preserves operator configuration', (t) => {
+    const f = fixture(t);
+    writeFileSync(join(f.destination, 'sync.mjs'), 'throw new Error("Never execute the partial runtime");\n');
+    writeFileSync(join(f.destination, '.env'), 'FIXTURE_VALUE=keep-me\n');
+    const run = spawnSync('bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).status, 'installed');
+    assert.equal(readFileSync(join(f.destination, '.env'), 'utf8'), 'FIXTURE_VALUE=keep-me\n');
+    const executed = spawnSync('bash', [runner, f.destination], { env: f.env, encoding: 'utf8' });
+    assert.equal(executed.status, 0, executed.stderr);
+    assert.equal(JSON.parse(executed.stdout).fixture, 'keep-me');
+  });
+
+  for (const damage of [
+    'missing dependency',
+    'missing dependency entrypoint',
+    'missing metadata',
+    'changed library',
+    'obsolete library',
+    'malformed marker',
+    'old schema',
+    'new schema',
+    'wrong release'
+  ]) {
+    it(`repairs ${damage} instead of reporting a ready runtime`, (t) => {
+      const f = fixture(t);
+      const installed = spawnSync('bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+      assert.equal(installed.status, 0, installed.stderr);
+      const marker = join(f.destination, '.sync-runtime.json');
+      if (damage === 'missing dependency') rmSync(join(f.destination, 'node_modules/fixture-dep'), { recursive: true });
+      else if (damage === 'missing dependency entrypoint')
+        rmSync(join(f.destination, 'node_modules/fixture-dep/index.js'));
+      else if (damage === 'missing metadata') rmSync(join(f.destination, 'node_modules/.package-lock.json'));
+      else if (damage === 'changed library') writeFileSync(join(f.destination, 'lib/helper.mjs'), 'broken library\n');
+      else if (damage === 'obsolete library') writeFileSync(join(f.destination, 'lib/obsolete.mjs'), 'obsolete file\n');
+      else if (damage === 'malformed marker') writeFileSync(marker, 'bad JSON');
+      else {
+        const state = JSON.parse(readFileSync(marker, 'utf8'));
+        if (damage === 'old schema') state.schema_version = 0;
+        if (damage === 'new schema') state.schema_version = 2;
+        if (damage === 'wrong release') state.requestedVersion = '0.0.1';
+        writeFileSync(marker, JSON.stringify(state));
+      }
+      const repaired = spawnSync('bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+      assert.equal(repaired.status, 0, repaired.stderr);
+      assert.equal(JSON.parse(repaired.stdout).status, 'installed');
+      assert.equal(existsSync(join(f.destination, 'lib/obsolete.mjs')), false);
+      const present = spawnSync('bash', [installer, f.destination], {
+        env: { ...f.env, FIXTURE_FAIL_DOWNLOAD: '1' },
+        encoding: 'utf8'
+      });
+      assert.equal(present.status, 0, present.stderr);
+      assert.equal(JSON.parse(present.stdout).status, 'present');
+    });
+  }
+
+  it('imports runtime-state without inspecting files and rejects invalid CLI usage', (t) => {
+    const f = fixture(t);
+    const url = new URL('runtime-state.mjs', import.meta.url).href;
+    const imported = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', `await import(${JSON.stringify(url)})`],
+      { cwd: f.root, encoding: 'utf8' }
+    );
+    assert.equal(imported.status, 0, imported.stderr);
+    assert.equal(imported.stdout, '');
+    assert.equal(imported.stderr, '');
+    const usage = spawnSync(process.execPath, [runtimeState], { encoding: 'utf8' });
+    assert.equal(usage.status, 2);
+    assert.match(usage.stderr, /Usage:/);
+    assert.equal(usage.stdout, '');
+  });
+
+  it('refuses the filesystem root and a symlink to it before installation', (t) => {
+    const f = fixture(t);
+    const root = parse(f.root).root;
+    const link = join(f.root, 'root-link');
+    symlinkSync(root, link);
+    for (const path of [root, link]) {
+      const check = spawnSync(process.execPath, [runtimeState, 'check', path, installedVersion], { encoding: 'utf8' });
+      assert.equal(check.status, 2);
+      assert.equal(check.stdout, '');
+      assert.match(check.stderr, /Choose a dedicated runtime directory/);
+    }
   });
 
   for (const [failure, expected] of [
