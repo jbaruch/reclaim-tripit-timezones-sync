@@ -9,6 +9,7 @@ on:
       - 'skills/**'
       - 'evals/**'
       - 'README.md'
+      - '.tesslignore'
 
 # Serialize publishes on main: a closely-following push could otherwise race
 # (both runs querying the same registry version, both publishing the same
@@ -78,6 +79,11 @@ jobs:
 
       - name: Lint plugin
         run: tessl plugin lint
+
+      - name: Review skills before publication
+        uses: jbaruch/coding-policy/.github/actions/skill-review@f396973a41c359b7ee00950b48817d9603563772
+        with:
+          threshold: '85'
 
       - name: Publish plugin to Tessl registry
         # Publishes the version pinned in .tessl-plugin/plugin.json. Plugins

@@ -2,13 +2,17 @@
 
 ## 0.3.5 — 2026-10-23
 
-- Include created and deleted trip names in the OOO JSON result. Preserve
-  `setToP2` and expose the equivalent `prioritySet` counter used by reports.
-- Preserve TripIt all-day dates across process timezones. Reconcile only active
-  Reclaim overrides and OOO blocks, keeping the complete schedule in JSON.
-  Create neighboring Reclaim entries sequentially and report priority-only changes.
+- Include named OOO changes and the prioritySet alias while preserving setToP2.
+- Preserve all-day trip dates across process timezones. Reconcile only active
+  overrides and OOO blocks, retaining the full JSON schedule. Create neighboring
+  overrides sequentially and report priority-only changes.
 
-## Unreleased
+## 0.3.4 — 2026-10-23
+
+- Gate runtime changes with pinned formatting, lint, JavaScript diagnostics and
+  outcome tests. Package only plugin content, and publish packaging changes.
+- Delegate sync installation and execution to guarded, tested scripts. Keep
+  operator configuration and expose a new runtime only after its dependencies install.
 
 - OOO calendar blocks are now anchored at **home-local midnight** instead of
   UTC midnight. A UTC-midnight block renders as the evening before in a
