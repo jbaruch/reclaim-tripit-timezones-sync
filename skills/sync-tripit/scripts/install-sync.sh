@@ -29,7 +29,7 @@ install_sync_main() (
   local staging
   staging=$(mktemp -d)
   local pending_main=''
-  # shellcheck disable=SC2329 # Invoked indirectly by the EXIT trap below.
+  # shellcheck disable=SC2329,SC2317 # EXIT-only callback; ShellCheck 0.10 misses the indirect invocation below.
   cleanup_install() {
     if ! rm -rf -- "$staging"; then
       echo 'Could not remove temporary installer files; inspect the system temporary directory.' >&2
