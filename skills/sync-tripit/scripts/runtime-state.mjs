@@ -3,7 +3,8 @@
  * ../references/runtime-state.md. No application code or credentials are loaded.
  * CLI: check|seal DIRECTORY VERSION. Stdout: JSON with operation, ready, path,
  * requestedVersion. Exit 0: ready/sealed; 1: incomplete runtime; 2: usage;
- * 3: unexpected operational failure. The installer consumes this internal result.
+ * 3: unexpected operational failure; 4: newer state requires a reader update.
+ * The installer consumes this internal result.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
@@ -103,7 +104,22 @@ export function main(args = process.argv.slice(2)) {
     return ready ? 0 : 1;
   }
   try {
-    const previous = operation === 'check' ? readJson(marker) : null;
+    const previous = operation === 'check' || existsSync(marker) ? readJson(marker) : null;
+    if (Number.isInteger(previous?.schema_version) && previous.schema_version > 1) {
+      console.error(
+        'This runtime uses a newer installer schema. Update the reclaim-tripit-sync plugin before retrying; the existing runtime was left intact.'
+      );
+      console.log(
+        JSON.stringify({
+          operation,
+          ready: false,
+          path: directory,
+          requestedVersion: version,
+          error: 'newer-runtime-schema'
+        })
+      );
+      return 4;
+    }
     if (operation === 'check' && (previous?.schema_version !== 1 || previous.requestedVersion !== version))
       return report(false);
     const files = snapshot(directory);

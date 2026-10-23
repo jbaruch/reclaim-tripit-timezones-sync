@@ -13,8 +13,9 @@ hidden lock. It checks their live bytes, installed package directories and local
 resolution of required dependencies. It never imports the application or reads
 `.env`. The snapshot proves installation completion, not authorization.
 
-A missing, malformed, older, newer, or mismatched-version snapshot means no usable
+A missing, malformed, older, or mismatched-version snapshot means no usable
 prior state. A mismatch with the live filesystem also requires repair. The
 installer stages a fresh pinned installation and the owner writes a new version-1
-snapshot; unknown schemas are never interpreted or migrated in place. Configuration
-is preserved. There are no readers in another release pipeline.
+snapshot. A newer schema refuses both checking and sealing with exit 4 and an
+actionable reader-update diagnostic; it is never overwritten by an older owner.
+Configuration is preserved. There are no readers in another release pipeline.
