@@ -5,7 +5,6 @@ export default [
   js.configs.recommended,
   {
     files: ['**/*.mjs'],
-    languageOptions: { globals: globals.node },
-    rules: { 'no-unused-vars': ['error', { argsIgnorePattern: '^_' }] }
+    languageOptions: { globals: globals.node }
   }
 ];
