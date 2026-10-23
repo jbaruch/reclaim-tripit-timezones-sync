@@ -9,6 +9,9 @@ sync.mjs
 package.json
 package-lock.json
 jsconfig.json
+eslint.config.mjs
+.prettierrc.json
+renovate.json
 
 # Container / deployment
 Dockerfile
