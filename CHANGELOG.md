@@ -4,6 +4,9 @@
 
 - Include created and deleted trip names in the OOO JSON result. Preserve
   `setToP2` and expose the equivalent `prioritySet` counter used by reports.
+- Preserve TripIt all-day dates across process timezones. Reconcile only active
+  Reclaim overrides and OOO blocks, keeping the complete schedule in JSON.
+  Create neighboring Reclaim entries sequentially and report priority-only changes.
 
 ## Unreleased
 

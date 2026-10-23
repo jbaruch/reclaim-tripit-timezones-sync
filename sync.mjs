@@ -10,6 +10,7 @@ import {
   extractLodging,
   buildTimezoneSegments,
   filterFutureSegments,
+  filterReclaimSegments,
   filterFutureTrips,
   filterIgnoredTrips,
   deduplicateSegments,
@@ -33,6 +34,7 @@ import {
   listOooEvents,
   createOooEvent,
   deleteOooEvent,
+  oooDateAt,
   OOO_PREFIX,
 } from './lib/google-calendar.mjs';
 
@@ -121,6 +123,8 @@ try {
 
   // Step 1: Fetch and parse iCal feed
   const events = await fetchIcalEvents(TRIPIT_ICAL_URL);
+  const referenceNow = new Date();
+  const today = referenceNow.toISOString().slice(0, 10);
   const allTrips = extractTrips(events);
   const flights = extractFlights(events);
   const stays = extractLodging(events);
@@ -138,7 +142,7 @@ try {
   console.log(`  Built ${allSegments.length} segment(s)`);
 
   // Step 3: Filter and deduplicate
-  const future = filterFutureSegments(allSegments);
+  const future = filterFutureSegments(allSegments, today);
   console.log(`  ${future.length} future segment(s) > 1 day`);
 
   const deduped = deduplicateSegments(future);
@@ -167,6 +171,7 @@ try {
   }
 
   const { kept: segments, dropped: homeDropped } = filterHomeTimezoneSegments(deduped, homeTz);
+  const reclaimSegments = filterReclaimSegments(segments, today);
   if (homeDropped.length > 0) {
     console.log(`  Dropped ${homeDropped.length} redundant home-timezone segment(s) [${homeTz}]`);
   }
@@ -204,7 +209,7 @@ try {
   }));
 
   // Get future trips for OOO sync
-  const futureTrips = filterFutureTrips(trips);
+  const futureTrips = filterFutureTrips(trips, oooDateAt(homeTz, referenceNow));
 
   // Google Calendar client (null when OOO not configured / not opted in).
   // In OneCLI mode the gateway injects Google auth; createGCalClient ignores
@@ -241,7 +246,7 @@ try {
   let timezoneChanged = false;
 
   // Skip timezone sync if nothing changed
-  if (!entriesChanged(previousEntries, segments)) {
+  if (!entriesChanged(previousEntries, reclaimSegments)) {
     console.log('  No timezone changes detected — skipping timezone sync.');
   } else {
     timezoneChanged = true;
@@ -256,21 +261,23 @@ try {
     }
 
     // Create new entries
-    if (segments.length === 0) {
+    if (reclaimSegments.length === 0) {
       console.log('  No segments to sync.');
     } else {
-      for (const s of segments) {
+      for (const s of reclaimSegments) {
         console.log(`  Creating: ${s.timezone} (${s.startDate} → ${s.endDate})`);
+        // Await each completed create before the next neighboring segment,
+        // avoiding Reclaim's shared-boundary race.
+        await createEntry(client, {
+          startDate: s.startDate,
+          endDate: s.endDate,
+          timezone: s.timezone,
+        });
         result.timezoneChanges.push({
           action: 'create', timezone: s.timezone, from: s.startDate, to: s.endDate,
         });
       }
-      await Promise.all(segments.map(s => createEntry(client, {
-        startDate: s.startDate,
-        endDate: s.endDate,
-        timezone: s.timezone,
-      })));
-      console.log(`  Created ${segments.length} ${segments.length === 1 ? 'entry' : 'entries'}`);
+      console.log(`  Created ${reclaimSegments.length} ${reclaimSegments.length === 1 ? 'entry' : 'entries'}`);
     }
   }
 
@@ -303,14 +310,14 @@ try {
       throw new Error(msg, { cause: err });
     }
     result.ooo = oooResult(oooStats);
-    if (oooStats.created > 0 || oooStats.deleted > 0) {
+    if (oooStats.created > 0 || oooStats.deleted > 0 || oooStats.prioritySet > 0) {
       result.noChanges = false;
     }
   }
 
   // Notify on changes (never throws)
   if (timezoneChanged || (oooStats && (oooStats.created > 0 || oooStats.deleted > 0 || oooStats.prioritySet > 0))) {
-    await sendNotification(previousEntries, segments, future, oooStats);
+    await sendNotification(previousEntries, reclaimSegments, filterReclaimSegments(future, today), oooStats);
   }
 
   console.log('\nSync complete!');
