@@ -1,6 +1,6 @@
 # Installed runtime snapshot
 
-`scripts/runtime-state.mjs` owns and is the only reader/writer of
+`skills/sync-tripit/scripts/runtime-state.mjs` owns and is the only reader/writer of
 `INSTALL_DIRECTORY/.sync-runtime.json`. The installer calls `seal` only after a
 successful staged dependency installation, and `check` before reusing it.
 Both commands emit a JSON result with `operation`, `ready`, `path` and
