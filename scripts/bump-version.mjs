@@ -18,7 +18,13 @@ export function main(argv = process.argv.slice(2), root = fileURLToPath(new URL(
   const manifestPath = '.tessl-plugin/plugin.json';
   const installerPath = 'skills/sync-tripit/scripts/install-sync.sh';
   const archiveFiles = ['evals/sync-library-installation-and-execution/criteria.json', 'research.md'];
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, manifestPath), 'utf8'));
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(path.join(root, manifestPath), 'utf8'));
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    throw new VersionSourceError(`Restore valid JSON in ${manifestPath}, then retry the release bump.`);
+  }
   if (!manifest || typeof manifest !== 'object' || typeof manifest.version !== 'string') {
     throw new VersionSourceError(`Restore the version field in ${manifestPath}, then retry the release bump.`);
   }

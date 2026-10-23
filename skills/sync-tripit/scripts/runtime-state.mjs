@@ -2,8 +2,8 @@
  * Installer-owned completion snapshot. Schema and recovery contract:
  * ../references/runtime-state.md. No application code or credentials are loaded.
  * CLI: check|seal DIRECTORY VERSION. Stdout: JSON with operation, ready, path,
- * requestedVersion. Exit 0: ready/sealed; 1: incomplete runtime; 2: usage.
- * Unexpected I/O fails visibly. The installer consumes this internal result.
+ * requestedVersion. Exit 0: ready/sealed; 1: incomplete runtime; 2: usage;
+ * 3: unexpected operational failure. The installer consumes this internal result.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
@@ -123,5 +123,26 @@ if (
   existsSync(process.argv[1]) &&
   realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  process.exitCode = main();
+  try {
+    process.exitCode = main();
+    // outer-boundary-process-contract: install-sync.sh treats exit 1 as an
+    // incomplete runtime it may repair. Emit JSON and an actionable diagnostic
+    // with exit 3 for unexpected failures; propagation would also exit 1 and
+    // incorrectly turn a verification failure into permission to reinstall.
+  } catch (error) {
+    console.log(
+      JSON.stringify({
+        operation: process.argv[2],
+        path: process.argv[3],
+        requestedVersion: process.argv[4],
+        ready: false,
+        error: 'runtime-verification-failed',
+        failureKind: error instanceof Error ? 'Error' : 'non-Error'
+      })
+    );
+    console.error(
+      'Runtime verification failed unexpectedly; inspect directory permissions and the runtime-state helper before retrying install-sync.sh.'
+    );
+    process.exitCode = 3;
+  }
 }

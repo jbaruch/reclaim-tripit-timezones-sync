@@ -47,8 +47,8 @@ function fixture(t) {
   assert.equal(packed.status, 0, packed.stderr);
   writeFileSync(
     join(bin, 'curl'),
-    `#!/bin/sh
-set -eu
+    `#!/usr/bin/env bash
+set -euo pipefail
 if [ "\${FIXTURE_FAIL_DOWNLOAD:-0}" = 1 ]; then
   echo 'Fixture download failed; retry later.' >&2
   exit 22
@@ -63,8 +63,8 @@ cp "$FIXTURE_ARCHIVE" "$4"
   );
   writeFileSync(
     join(bin, 'npm'),
-    `#!/bin/sh
-set -eu
+    `#!/usr/bin/env bash
+set -euo pipefail
 if [ "\${FIXTURE_FAIL_NPM:-0}" = 1 ]; then
   echo 'Fixture npm install failed; retry later.' >&2
   exit 9
@@ -196,6 +196,32 @@ describe('shipped sync installer and runner', () => {
       assert.equal(JSON.parse(present.stdout).status, 'present');
     });
   }
+
+  it('propagates unexpected verifier failures instead of repairing the runtime', (t) => {
+    const f = fixture(t);
+    const installed = spawnSync('bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+    assert.equal(installed.status, 0, installed.stderr);
+    const preload = join(f.root, 'verifier-failure.mjs');
+    writeFileSync(
+      preload,
+      `import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const original = fs.readFileSync;
+fs.readFileSync = function(file, ...args) {
+  if (String(file).endsWith('.sync-runtime.json')) throw new Error('Fixture verifier failure');
+  return original.call(this, file, ...args);
+};
+syncBuiltinESMExports();\n`
+    );
+    const run = spawnSync('bash', [installer, f.destination], {
+      env: { ...f.env, NODE_OPTIONS: `--import=${preload}`, FIXTURE_FAIL_DOWNLOAD: '1' },
+      encoding: 'utf8'
+    });
+    assert.equal(run.status, 3, run.stderr);
+    assert.equal(run.stdout, '');
+    assert.match(run.stderr, /Runtime verification failed unexpectedly/);
+    assert.doesNotMatch(run.stderr, /Fixture download failed/);
+  });
 
   it('imports runtime-state without inspecting files and rejects invalid CLI usage', (t) => {
     const f = fixture(t);
@@ -334,6 +360,26 @@ function releaseFixture(t) {
 }
 
 describe('release version synchronization', () => {
+  it('reports malformed manifest JSON without changing release sources', (t) => {
+    const f = releaseFixture(t);
+    const files = [
+      '.tessl-plugin/plugin.json',
+      'skills/sync-tripit/scripts/install-sync.sh',
+      'evals/sync-library-installation-and-execution/criteria.json',
+      'research.md'
+    ];
+    writeFileSync(join(f.releaseRoot, files[0]), '{invalid JSON');
+    const before = files.map((file) => readFileSync(join(f.releaseRoot, file), 'utf8'));
+    const run = spawnSync('bash', [f.script, '4.5.6'], { cwd: f.root, encoding: 'utf8' });
+    assert.equal(run.status, 1);
+    assert.equal(run.stdout, '');
+    assert.match(run.stderr, /Restore valid JSON in \.tessl-plugin\/plugin.json, then retry/);
+    assert.deepEqual(
+      files.map((file) => readFileSync(join(f.releaseRoot, file), 'utf8')),
+      before
+    );
+  });
+
   for (const damaged of [
     'skills/sync-tripit/scripts/install-sync.sh',
     'evals/sync-library-installation-and-execution/criteria.json',
