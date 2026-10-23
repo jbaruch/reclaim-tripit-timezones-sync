@@ -4,7 +4,7 @@
 # Default directory: $HOME/.tripit-reclaim. Operator-owned .env is kept.
 # Stdout: one JSON object {status: installed|present, path, requestedVersion}.
 # Exit 0: ready; 2: bad arguments; other nonzero: download/extract/install failed.
-# Dependencies: bash, node; curl, tar, npm only for installation/repair.
+# Dependencies: bash, Node >=22.19.0; curl, tar, npm only for installation/repair.
 # No credentials are read or printed.
 set -euo pipefail
 
@@ -16,7 +16,21 @@ install_sync_main() (
   local install_dir="${1:-$HOME/.tripit-reclaim}"
   local version='0.3.4'
   if ! command -v node >/dev/null; then
-    echo 'Install node and retry install-sync.sh.' >&2
+    echo 'Install Node >=22.19.0 and retry install-sync.sh.' >&2
+    return 1
+  fi
+  local node_version
+  if ! node_version=$(node --version); then
+    echo 'Cannot query Node — install Node >=22.19.0 and retry install-sync.sh.' >&2
+    return 1
+  fi
+  # Keep this minimum aligned with package.json engines.node when changing it.
+  if [[ ! "$node_version" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    echo 'Cannot identify a stable Node version — install Node >=22.19.0 and retry install-sync.sh.' >&2
+    return 1
+  fi
+  if (( 10#${BASH_REMATCH[1]} < 22 || (10#${BASH_REMATCH[1]} == 22 && 10#${BASH_REMATCH[2]} < 19) )); then
+    echo "Node $node_version is unsupported — install Node >=22.19.0 and retry install-sync.sh." >&2
     return 1
   fi
   local script_dir="${BASH_SOURCE[0]%/*}"

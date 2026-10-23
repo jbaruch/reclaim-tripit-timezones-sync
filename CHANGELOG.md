@@ -6,7 +6,8 @@
   outcome tests. Package only plugin content, and publish packaging changes.
 - Delegate sync installation and execution to guarded, tested scripts. Keep
   operator configuration, repair incomplete legacy installs, and verify runtime
-  completion before reuse. Download tools are needed only for installation.
+  completion before reuse. Reject unsupported Node versions before installation
+  or reuse. Download tools are needed only for installation.
 
 - OOO calendar blocks are now anchored at **home-local midnight** instead of
   UTC midnight. A UTC-midnight block renders as the evening before in a

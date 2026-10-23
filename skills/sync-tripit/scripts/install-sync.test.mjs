@@ -83,6 +83,63 @@ echo 'Fixture npm progress' >&2
 }
 
 describe('shipped sync installer and runner', () => {
+  for (const existing of [false, true]) {
+    for (const nodeVersion of ['v20.20.0', 'v22.18.0', 'unknown-version']) {
+      it(`refuses ${nodeVersion} before ${existing ? 'reusing' : 'installing'} a runtime`, (t) => {
+        const f = fixture(t);
+        if (existing) {
+          const installed = spawnSync('bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+          assert.equal(installed.status, 0, installed.stderr);
+        }
+        writeFileSync(join(f.destination, '.env'), 'FIXTURE_VALUE=keep-config\n');
+        const before = existing ? readFileSync(join(f.destination, '.sync-runtime.json'), 'utf8') : null;
+        writeFileSync(
+          join(f.bin, 'node'),
+          `#!/bin/bash
+set -euo pipefail
+if [[ "$1" != '--version' ]]; then
+  echo 'Unexpected runtime invocation before the Node gate' >&2
+  exit 97
+fi
+printf '%s\\n' '${nodeVersion}'
+`,
+          { mode: 0o755 }
+        );
+        const run = spawnSync('/bin/bash', [installer, f.destination], {
+          env: { ...f.env, FIXTURE_FAIL_DOWNLOAD: '1' },
+          encoding: 'utf8'
+        });
+        assert.equal(run.status, 1, run.stderr);
+        assert.equal(run.stdout, '');
+        assert.match(run.stderr, /install Node >=22\.19\.0 and retry install-sync\.sh/);
+        assert.equal(readFileSync(join(f.destination, '.env'), 'utf8'), 'FIXTURE_VALUE=keep-config\n');
+        if (existing) assert.equal(readFileSync(join(f.destination, '.sync-runtime.json'), 'utf8'), before);
+        else assert.equal(existsSync(join(f.destination, 'sync.mjs')), false);
+      });
+    }
+    it(`accepts the minimum Node version before ${existing ? 'reusing' : 'installing'} a runtime`, (t) => {
+      const f = fixture(t);
+      if (existing) {
+        const installed = spawnSync('bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+        assert.equal(installed.status, 0, installed.stderr);
+      }
+      writeFileSync(
+        join(f.bin, 'node'),
+        `#!/bin/bash
+set -euo pipefail
+if [[ "$1" == '--version' ]]; then
+  printf '%s\\n' 'v22.19.0'
+  exit 0
+fi
+exec '${process.execPath}' "$@"
+`,
+        { mode: 0o755 }
+      );
+      const run = spawnSync('/bin/bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+      assert.equal(run.status, 0, run.stderr);
+      assert.equal(JSON.parse(run.stdout).status, existing ? 'present' : 'installed');
+    });
+  }
   it('runs both declared plugin-mount commands from a consumer workspace', (t) => {
     const f = fixture(t);
     const workspace = join(f.root, 'consumer');
