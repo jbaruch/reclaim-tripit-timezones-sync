@@ -1,76 +1,42 @@
 #!/usr/bin/env bash
-# Bump the plugin's version and propagate the install tarball URL to
-# SKILL.md, eval criteria, and research.md so installs pull a tarball
-# matching the plugin's pinned version. (Only the install URL is rewritten
-# — example version strings inside research.md's manifest snippets are
-# illustrative templates and stay as-is.)
-#
-# Usage (from repo root): scripts/bump-version.sh <new-version>
-#   e.g. scripts/bump-version.sh 0.3.0
-#
-# The script `cd`s to the repo root itself, so it can be invoked from
-# anywhere. After running, review the diff, commit, push, and merge —
-# the publish-plugin GitHub Actions workflow handles tagging and registry
-# publish on merge to main (see "Next steps" output below).
+# Synchronize a release version across the plugin, installer and archive references.
+# Usage: bash scripts/bump-version.sh X.Y.Z (works from any working directory).
+# Stdout: JSON {version, updated}; diagnostics/progress: stderr.
+# Exit 0: updated; 2: invalid arguments; other nonzero: filesystem/tool failure.
+# Only archive URL references and the installer's version are rewritten; unrelated
+# illustrative versions in research.md are preserved. The merge publisher owns tags.
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 <new-version>" >&2
-  exit 2
+bump_version_main() (
+  if [[ "$#" -ne 1 || ! "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo 'Usage: bash scripts/bump-version.sh X.Y.Z — supply one complete release version.' >&2
+    return 2
+  fi
+  local release_version="$1"
+  cd "$(dirname "${BASH_SOURCE[0]}")/.."
+  node -e '
+    const fs = require("node:fs");
+    const file = ".tessl-plugin/plugin.json";
+    const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+    manifest.version = process.argv[1];
+    fs.writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n");
+  ' "$release_version"
+  sed -i.bak -E "s|local version='[0-9]+\.[0-9]+\.[0-9]+'|local version='${release_version}'|" \
+    skills/sync-tripit/scripts/install-sync.sh
+  rm -f skills/sync-tripit/scripts/install-sync.sh.bak
+  local file
+  for file in evals/sync-library-installation-and-execution/criteria.json research.md; do
+    sed -i.bak -E "s|archive/refs/tags/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|archive/refs/tags/v${release_version}.tar.gz|g" "$file"
+    rm -f "$file.bak"
+  done
+  node -e '
+    console.log(JSON.stringify({version:process.argv[1],updated:[
+      ".tessl-plugin/plugin.json", "skills/sync-tripit/scripts/install-sync.sh",
+      "evals/sync-library-installation-and-execution/criteria.json", "research.md"
+    ]}));
+  ' "$release_version"
+)
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  bump_version_main "$@"
 fi
-
-NEW="$1"
-
-if ! [[ "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "Error: version must be semver X.Y.Z, got '$NEW'" >&2
-  exit 2
-fi
-
-# Run from the repo root (parent of scripts/) so paths are relative.
-cd "$(dirname "$0")/.."
-
-CURRENT=$(node -e "console.log(require('./.tessl-plugin/plugin.json').version)")
-echo "Bumping $CURRENT → $NEW"
-
-# plugin.json
-node -e "
-  const fs = require('fs');
-  const t = JSON.parse(fs.readFileSync('./.tessl-plugin/plugin.json', 'utf8'));
-  t.version = '$NEW';
-  fs.writeFileSync('./.tessl-plugin/plugin.json', JSON.stringify(t, null, 2) + '\n');
-"
-
-# SKILL.md install URL
-sed -i.bak -E "s|archive/refs/tags/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|archive/refs/tags/v${NEW}.tar.gz|g" \
-  ./skills/sync-tripit/SKILL.md
-rm -f ./skills/sync-tripit/SKILL.md.bak
-
-# Eval criteria URL
-sed -i.bak -E "s|archive/refs/tags/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|archive/refs/tags/v${NEW}.tar.gz|g" \
-  ./evals/sync-library-installation-and-execution/criteria.json
-rm -f ./evals/sync-library-installation-and-execution/criteria.json.bak
-
-# research.md (illustrative reference; keep consistent for readers)
-sed -i.bak -E "s|archive/refs/tags/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|archive/refs/tags/v${NEW}.tar.gz|g" \
-  ./research.md
-rm -f ./research.md.bak
-
-echo
-echo "Updated:"
-echo "  .tessl-plugin/plugin.json"
-echo "  skills/sync-tripit/SKILL.md"
-echo "  evals/sync-library-installation-and-execution/criteria.json"
-echo "  research.md"
-echo
-echo "Next steps:"
-echo "  1. Add a CHANGELOG entry for $NEW under CHANGELOG.md"
-echo "  2. Review the diff, commit, push the branch, open a PR"
-echo "  3. After the PR merges, the publish-plugin workflow runs automatically."
-echo "     It pushes the v$NEW tag (so the in-skill curl URL resolves) and"
-echo "     publishes the plugin to the Tessl registry. No manual 'git tag'"
-echo "     or 'tessl plugin publish' is needed."
-echo
-echo "     The publish step requires a TESSL_TOKEN repo secret with"
-echo "     publisher role under Settings → Secrets and variables →"
-echo "     Actions. Without it, the workflow run fails at the publish step"
-echo "     (the tag step still succeeds)."

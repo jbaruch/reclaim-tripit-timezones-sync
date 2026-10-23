@@ -11,8 +11,8 @@
     "sync": "node sync.mjs sync",
     "test": "node --test",
     "typecheck": "tsc --noEmit -p jsconfig.json",
-    "lint": "eslint sync.mjs sync.test.mjs lib/ eslint.config.mjs",
-    "format:check": "prettier --check sync.mjs sync.test.mjs \"lib/*.mjs\" eslint.config.mjs .prettierrc.json jsconfig.json renovate.json .github/workflows/test.yml package.json"
+    "lint": "eslint sync.mjs sync.test.mjs lib/ eslint.config.mjs \"skills/**/*.test.mjs\"",
+    "format:check": "prettier --check sync.mjs sync.test.mjs \"lib/*.mjs\" eslint.config.mjs .prettierrc.json jsconfig.json renovate.json .github/workflows/test.yml package.json \"skills/**/*.test.mjs\""
   },
   "dependencies": {
     "geo-tz": "^8.1.1",

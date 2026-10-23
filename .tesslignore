@@ -31,3 +31,6 @@ AWS_DEPLOYMENT.md
 .github/
 scripts/
 .claude/
+
+# Runtime installer fixtures run in CI, not in the installed skill.
+skills/**/*.test.mjs

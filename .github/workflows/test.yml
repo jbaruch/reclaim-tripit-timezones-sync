@@ -25,4 +25,6 @@ jobs:
         run: npm run lint
       - name: JavaScript diagnostics
         run: npm run typecheck
+      - name: Shell diagnostics
+        run: shellcheck scripts/bump-version.sh skills/sync-tripit/scripts/*.sh
       - run: npm test

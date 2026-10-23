@@ -11,31 +11,31 @@ description: >
 
 ## Step 1: Ensure the sync library is installed
 
-```bash
-INSTALL_DIR="$HOME/.tripit-reclaim"
-if [ ! -f "$INSTALL_DIR/sync.mjs" ]; then
-  mkdir -p "$INSTALL_DIR"
-  curl -sL https://github.com/jbaruch/reclaim-tripit-timezones-sync/archive/refs/tags/v0.3.4.tar.gz \
-    | tar xz --strip-components=1 -C "$INSTALL_DIR"
-  cd "$INSTALL_DIR" && npm ci --omit=dev
-fi
-```
-
-Verify installation succeeded:
+Run the co-shipped installer with this skill's directory as the working directory:
 
 ```bash
-[ -f "$HOME/.tripit-reclaim/sync.mjs" ] || { echo "Install failed"; exit 1; }
+bash scripts/install-sync.sh
 ```
 
-If `sync.mjs` does not exist after the install step, report the download failure and stop.
+Optional input: one installation directory, default `$HOME/.tripit-reclaim`.
+The installer preserves an existing runtime and `.env`. On exit 0, stdout is one
+JSON object with `status` (`installed` or `present`), `path`, and `requestedVersion`.
+The requested version is not a claim about a previously installed runtime.
+On a nonzero exit, report its stderr diagnostic and stop; no usable new
+`sync.mjs` is published after a failed download or dependency installation.
 
 ## Step 2: Run the sync
 
+From this skill's directory:
+
 ```bash
-INSTALL_DIR="$HOME/.tripit-reclaim"
-[ -f "$INSTALL_DIR/.env" ] && set -a && source "$INSTALL_DIR/.env" && set +a
-node "$INSTALL_DIR/sync.mjs" sync --output=json
+bash scripts/run-sync.sh
 ```
+
+Optional input: the same installation directory used in Step 1. The runner
+loads its operator-owned `.env` when present, then runs the runtime in sync/JSON
+mode. It preserves stdout and the exit status; setup failures emit stderr and
+exit nonzero. It never prints credential values.
 
 Capture the full stdout (JSON) and the exit code. Stderr may contain human-readable diagnostics on failure.
 
