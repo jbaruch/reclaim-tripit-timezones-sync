@@ -14,7 +14,7 @@ import {
   filterIgnoredTrips,
   deduplicateSegments,
   resolveHomeTimezone,
-  filterHomeTimezoneSegments,
+  filterHomeTimezoneSegments
 } from './lib/tripit.mjs';
 
 import {
@@ -24,7 +24,7 @@ import {
   createEntry,
   getPrimaryCalendar,
   listReclaimEvents,
-  setEventPriority,
+  setEventPriority
 } from './lib/reclaim.mjs';
 
 import {
@@ -33,14 +33,14 @@ import {
   listOooEvents,
   createOooEvent,
   deleteOooEvent,
-  OOO_PREFIX,
+  OOO_PREFIX
 } from './lib/google-calendar.mjs';
 
 import { entriesChanged, sendNotification, findOverlaps } from './lib/notify.mjs';
 
 // Parse CLI arguments: mode (positional) and --output=json (flag)
 const args = process.argv.slice(2);
-const outputIdx = args.findIndex(a => a.startsWith('--output='));
+const outputIdx = args.findIndex((a) => a.startsWith('--output='));
 const outputFormat = outputIdx >= 0 ? args.splice(outputIdx, 1)[0].split('=')[1] : 'text';
 if (outputFormat !== 'text' && outputFormat !== 'json') {
   console.error(`Unknown output format: ${outputFormat}`);
@@ -73,20 +73,26 @@ const result = {
   segments: [],
   ooo: null,
   conflicts: [],
-  errors: [],
+  errors: []
 };
 
 const TRIPIT_ICAL_URL = process.env.TRIPIT_ICAL_URL;
 const RECLAIM_API_TOKEN = process.env.RECLAIM_API_TOKEN;
 
 if (!TRIPIT_ICAL_URL) {
-  if (jsonOutput) { result.errors.push('Missing TRIPIT_ICAL_URL environment variable'); _log(JSON.stringify(result)); }
+  if (jsonOutput) {
+    result.errors.push('Missing TRIPIT_ICAL_URL environment variable');
+    _log(JSON.stringify(result));
+  }
   _error('Missing TRIPIT_ICAL_URL environment variable');
   process.exit(1);
 }
 
 if (!RECLAIM_API_TOKEN) {
-  if (jsonOutput) { result.errors.push('Missing RECLAIM_API_TOKEN environment variable'); _log(JSON.stringify(result)); }
+  if (jsonOutput) {
+    result.errors.push('Missing RECLAIM_API_TOKEN environment variable');
+    _log(JSON.stringify(result));
+  }
   _error('Missing RECLAIM_API_TOKEN environment variable');
   process.exit(1);
 }
@@ -99,13 +105,13 @@ const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
 // Optional: comma-separated trip names to ignore (case-insensitive substring match)
 const IGNORE_TRIPS = (process.env.TRIPIT_IGNORE_TRIPS || '')
   .split(',')
-  .map(s => s.trim().toLowerCase())
+  .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
 // Optional: comma-separated keywords — any trip whose name contains one of these is ignored
 const IGNORE_KEYWORDS = (process.env.TRIPIT_IGNORE_KEYWORDS || '')
   .split(',')
-  .map(s => s.trim().toLowerCase())
+  .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
 console.log(`\n=== TripIt → Reclaim Travel Timezone Sync ===`);
@@ -154,15 +160,18 @@ try {
   const client = createClient(RECLAIM_API_TOKEN);
   const current = await listEntries(client);
   const previousEntries = current.entries || [];
-  const defTz = typeof current.defaultTimezone === 'object'
-    ? JSON.stringify(current.defaultTimezone)
-    : current.defaultTimezone || 'unknown';
+  const defTz =
+    typeof current.defaultTimezone === 'object'
+      ? JSON.stringify(current.defaultTimezone)
+      : current.defaultTimezone || 'unknown';
   console.log(`  Default timezone: ${defTz}`);
 
   const homeTz = resolveHomeTimezone(process.env.HOME_TZ, current.defaultTimezone);
   result.homeTimezone = homeTz;
   if (!homeTz && current.defaultTimezone != null) {
-    console.log(`  WARNING: could not resolve home timezone from Reclaim (defaultTimezone: ${defTz}). Set HOME_TZ to drop redundant home-timezone overrides.`);
+    console.log(
+      `  WARNING: could not resolve home timezone from Reclaim (defaultTimezone: ${defTz}). Set HOME_TZ to drop redundant home-timezone overrides.`
+    );
   }
 
   const { kept: segments, dropped: homeDropped } = filterHomeTimezoneSegments(deduped, homeTz);
@@ -193,13 +202,13 @@ try {
   // wall-clock so a downstream walker can resolve at the actual
   // flight-arrival / check-in moment instead of UTC midnight of the
   // departure day. See jbaruch/nanoclaw-admin#229.
-  result.segments = segments.map(s => ({
+  result.segments = segments.map((s) => ({
     timezone: s.timezone,
     from: s.startDate,
     to: s.endDate,
     from_dt: s.startDateTime,
     to_dt: s.endDateTime,
-    label: s.label,
+    label: s.label
   }));
 
   // Get future trips for OOO sync
@@ -211,7 +220,7 @@ try {
   const googleCreds = {
     clientId: GOOGLE_CLIENT_ID,
     clientSecret: GOOGLE_CLIENT_SECRET,
-    refreshToken: GOOGLE_REFRESH_TOKEN,
+    refreshToken: GOOGLE_REFRESH_TOKEN
   };
   const gcal = createGCalClient(googleCreds);
 
@@ -250,7 +259,10 @@ try {
     await clearAllEntries(client, previousEntries);
     for (const e of previousEntries) {
       result.timezoneChanges.push({
-        action: 'delete', timezone: e.timezone, from: e.startDate, to: e.endDate,
+        action: 'delete',
+        timezone: e.timezone,
+        from: e.startDate,
+        to: e.endDate
       });
     }
 
@@ -261,14 +273,21 @@ try {
       for (const s of segments) {
         console.log(`  Creating: ${s.timezone} (${s.startDate} → ${s.endDate})`);
         result.timezoneChanges.push({
-          action: 'create', timezone: s.timezone, from: s.startDate, to: s.endDate,
+          action: 'create',
+          timezone: s.timezone,
+          from: s.startDate,
+          to: s.endDate
         });
       }
-      await Promise.all(segments.map(s => createEntry(client, {
-        startDate: s.startDate,
-        endDate: s.endDate,
-        timezone: s.timezone,
-      })));
+      await Promise.all(
+        segments.map((s) =>
+          createEntry(client, {
+            startDate: s.startDate,
+            endDate: s.endDate,
+            timezone: s.timezone
+          })
+        )
+      );
       console.log(`  Created ${segments.length} ${segments.length === 1 ? 'entry' : 'entries'}`);
     }
   }
@@ -292,10 +311,10 @@ try {
       if (process.env.ONECLI_URL && /401|unauthorized|invalid.?credential/i.test(msg)) {
         throw new Error(
           `Google Calendar OOO failed under OneCLI (${msg}). ` +
-          'Configure and authorize the OneCLI Google Calendar connection ' +
-          '(`onecli apps configure`) so the gateway can inject a real Bearer, ' +
-          'or set ENABLE_OOO=0 to skip OOO.',
-          { cause: err },
+            'Configure and authorize the OneCLI Google Calendar connection ' +
+            '(`onecli apps configure`) so the gateway can inject a real Bearer, ' +
+            'or set ENABLE_OOO=0 to skip OOO.',
+          { cause: err }
         );
       }
       if (err instanceof Error) throw err;
@@ -304,7 +323,7 @@ try {
     result.ooo = {
       created: oooStats.created,
       deleted: oooStats.deleted,
-      setToP2: oooStats.prioritySet,
+      setToP2: oooStats.prioritySet
     };
     if (oooStats.created > 0 || oooStats.deleted > 0) {
       result.noChanges = false;
@@ -382,7 +401,7 @@ async function syncOooEvents(reclaimClient, gcal, futureTrips, homeTz) {
       summary: name,
       startDate: trip.startDate,
       endDate: trip.endDate,
-      timeZone: homeTz,
+      timeZone: homeTz
     });
     createdEventIds.push(eventId);
     stats.created++;
@@ -396,8 +415,10 @@ async function syncOooEvents(reclaimClient, gcal, futureTrips, homeTz) {
   // If we just created events and Reclaim hasn't synced them yet, retry in 10 minutes
   if (stats.created > 0 && pendingPriority > 0) {
     const RETRY_DELAY_MS = parseInt(process.env.OOO_RETRY_DELAY_MS, 10) || 60 * 1000;
-    console.log(`  ${pendingPriority} new event(s) not yet in Reclaim — retrying priority in ${RETRY_DELAY_MS / 1000}s...`);
-    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+    console.log(
+      `  ${pendingPriority} new event(s) not yet in Reclaim — retrying priority in ${RETRY_DELAY_MS / 1000}s...`
+    );
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
     await setOooPriorities(reclaimClient, calendarId, futureTrips, stats);
   }
 
@@ -412,22 +433,15 @@ async function syncOooEvents(reclaimClient, gcal, futureTrips, homeTz) {
 async function setOooPriorities(reclaimClient, calendarId, futureTrips, stats) {
   if (futureTrips.length === 0) return 0;
 
-  const earliest = futureTrips.reduce((min, t) => t.startDate < min ? t.startDate : min, futureTrips[0].startDate);
-  const latest = futureTrips.reduce((max, t) => t.endDate > max ? t.endDate : max, futureTrips[0].endDate);
+  const earliest = futureTrips.reduce((min, t) => (t.startDate < min ? t.startDate : min), futureTrips[0].startDate);
+  const latest = futureTrips.reduce((max, t) => (t.endDate > max ? t.endDate : max), futureTrips[0].endDate);
 
   try {
-    const reclaimEvents = await listReclaimEvents(
-      reclaimClient,
-      calendarId,
-      earliest,
-      latest,
-    );
+    const reclaimEvents = await listReclaimEvents(reclaimClient, calendarId, earliest, latest);
 
-    const oooEvents = (reclaimEvents || []).filter(e =>
-      e.title?.startsWith(OOO_PREFIX)
-    );
+    const oooEvents = (reclaimEvents || []).filter((e) => e.title?.startsWith(OOO_PREFIX));
 
-    const needsPriority = oooEvents.filter(e => e.priority !== 'P2');
+    const needsPriority = oooEvents.filter((e) => e.priority !== 'P2');
 
     for (const ev of needsPriority) {
       console.log(`  Setting P2 priority: ${ev.title}`);
@@ -440,8 +454,8 @@ async function setOooPriorities(reclaimClient, calendarId, futureTrips, stats) {
     }
 
     // How many trips don't have a matching Reclaim event yet?
-    const foundNames = new Set(oooEvents.map(e => e.title));
-    const missing = futureTrips.filter(t => !foundNames.has(`${OOO_PREFIX}${t.summary}`));
+    const foundNames = new Set(oooEvents.map((e) => e.title));
+    const missing = futureTrips.filter((t) => !foundNames.has(`${OOO_PREFIX}${t.summary}`));
     return missing.length;
   } catch (err) {
     console.log(`  WARNING: Could not list Reclaim events for priority update: ${err.message}`);
