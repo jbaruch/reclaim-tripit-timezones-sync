@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.5 — 2026-10-23
+
+- Include created and deleted trip names in the OOO JSON result. Preserve
+  `setToP2` and expose the equivalent `prioritySet` counter used by reports.
+
 ## Unreleased
 
 - OOO calendar blocks are now anchored at **home-local midnight** instead of

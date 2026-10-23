@@ -37,6 +37,7 @@ import {
 } from './lib/google-calendar.mjs';
 
 import { entriesChanged, sendNotification, findOverlaps } from './lib/notify.mjs';
+import { oooResult } from './lib/ooo-result.mjs';
 
 // Parse CLI arguments: mode (positional) and --output=json (flag)
 const args = process.argv.slice(2);
@@ -301,11 +302,7 @@ try {
       if (err instanceof Error) throw err;
       throw new Error(msg, { cause: err });
     }
-    result.ooo = {
-      created: oooStats.created,
-      deleted: oooStats.deleted,
-      setToP2: oooStats.prioritySet,
-    };
+    result.ooo = oooResult(oooStats);
     if (oooStats.created > 0 || oooStats.deleted > 0) {
       result.noChanges = false;
     }
