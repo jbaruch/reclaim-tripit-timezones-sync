@@ -1,8 +1,9 @@
 /**
  * Installer-owned completion snapshot. Schema and recovery contract:
  * ../references/runtime-state.md. No application code or credentials are loaded.
- * CLI: check|seal DIRECTORY VERSION. Silent exit 0: ready/sealed; 1: incomplete
- * (check) or invalid staged runtime (seal); 2: usage. Unexpected I/O fails visibly.
+ * CLI: check|seal DIRECTORY VERSION. Stdout: JSON with operation, ready, path,
+ * requestedVersion. Exit 0: ready/sealed; 1: incomplete runtime; 2: usage.
+ * Unexpected I/O fails visibly. The installer consumes this internal result.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
@@ -93,19 +94,27 @@ export function main(args = process.argv.slice(2)) {
     return 2;
   }
   const marker = join(directory, markerName);
+  function report(ready, reason = 'The runtime is incomplete or does not match the requested release.') {
+    if (!ready)
+      console.error(
+        `${reason} Run install-sync.sh to repair it, or verify the published runtime if installation fails.`
+      );
+    console.log(JSON.stringify({ operation, ready, path: directory, requestedVersion: version }));
+    return ready ? 0 : 1;
+  }
   try {
     const previous = operation === 'check' ? readJson(marker) : null;
-    if (operation === 'check' && (previous?.schema_version !== 1 || previous.requestedVersion !== version)) return 1;
+    if (operation === 'check' && (previous?.schema_version !== 1 || previous.requestedVersion !== version))
+      return report(false);
     const files = snapshot(directory);
-    if (operation === 'check') return JSON.stringify(previous.files) === JSON.stringify(files) ? 0 : 1;
+    if (operation === 'check') return report(JSON.stringify(previous.files) === JSON.stringify(files));
     const pending = `${marker}.pending`;
     writeFileSync(pending, JSON.stringify({ schema_version: 1, requestedVersion: version, files }) + '\n');
     renameSync(pending, marker);
-    return 0;
+    return report(true);
   } catch (error) {
     if (!(error instanceof IncompleteRuntimeError)) throw error;
-    if (operation === 'seal') console.error(`${error.message} Retry install-sync.sh or verify the published runtime.`);
-    return 1;
+    return report(false, error.message);
   }
 }
 

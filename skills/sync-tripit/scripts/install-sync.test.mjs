@@ -1,6 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+  symlinkSync,
+  realpathSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, parse } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -216,6 +225,36 @@ describe('shipped sync installer and runner', () => {
       assert.equal(check.stdout, '');
       assert.match(check.stderr, /Choose a dedicated runtime directory/);
     }
+  });
+
+  it('emits structured readiness results for both operations and incomplete installs', (t) => {
+    const f = fixture(t);
+    const installed = spawnSync('bash', [installer, f.destination], { env: f.env, encoding: 'utf8' });
+    assert.equal(installed.status, 0, installed.stderr);
+    for (const operation of ['check', 'seal']) {
+      const run = spawnSync(process.execPath, [runtimeState, operation, f.destination, installedVersion], {
+        encoding: 'utf8'
+      });
+      assert.equal(run.status, 0, run.stderr);
+      assert.deepEqual(JSON.parse(run.stdout), {
+        operation,
+        ready: true,
+        path: realpathSync(f.destination),
+        requestedVersion: installedVersion
+      });
+    }
+    rmSync(join(f.destination, 'sync.mjs'));
+    const incomplete = spawnSync(process.execPath, [runtimeState, 'check', f.destination, installedVersion], {
+      encoding: 'utf8'
+    });
+    assert.equal(incomplete.status, 1);
+    assert.deepEqual(JSON.parse(incomplete.stdout), {
+      operation: 'check',
+      ready: false,
+      path: realpathSync(f.destination),
+      requestedVersion: installedVersion
+    });
+    assert.match(incomplete.stderr, /Run install-sync.sh to repair/);
   });
 
   for (const [failure, expected] of [

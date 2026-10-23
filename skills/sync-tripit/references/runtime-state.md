@@ -3,6 +3,8 @@
 `scripts/runtime-state.mjs` owns and is the only reader/writer of
 `INSTALL_DIRECTORY/.sync-runtime.json`. The installer calls `seal` only after a
 successful staged dependency installation, and `check` before reusing it.
+Both commands emit a JSON result with `operation`, `ready`, `path` and
+`requestedVersion`; the installer consumes it and emits its own single result.
 
 Schema version 1 is one JSON object: `schema_version` (1), `requestedVersion`
 (release semver), and `files` (relative managed file paths to SHA-256 hex strings).
