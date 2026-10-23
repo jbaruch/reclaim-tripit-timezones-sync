@@ -21,7 +21,7 @@ install_sync_main() (
   fi
   local script_dir="${BASH_SOURCE[0]%/*}"
   if [[ "$script_dir" == "${BASH_SOURCE[0]}" ]]; then script_dir='.'; fi
-  if node "$script_dir/runtime-state.mjs" check "$install_dir" "$version"; then
+  if node "$script_dir/runtime-state.mjs" check "$install_dir" "$version" >/dev/null; then
     node -e 'console.log(JSON.stringify({status:"present",path:process.argv[1],requestedVersion:process.argv[2]}))' "$install_dir" "$version"
     return 0
   else
@@ -58,7 +58,7 @@ install_sync_main() (
     return 1
   fi
   (cd "$staging/runtime" && npm ci --omit=dev >&2)
-  node "$script_dir/runtime-state.mjs" seal "$staging/runtime" "$version"
+  node "$script_dir/runtime-state.mjs" seal "$staging/runtime" "$version" >/dev/null
   # Publish sync.mjs last: an interrupted copy must not look like a ready install.
   mv "$staging/runtime/sync.mjs" "$staging/sync.mjs"
   mkdir -p -- "$install_dir"
@@ -69,7 +69,7 @@ install_sync_main() (
   cp "$staging/sync.mjs" "$pending_main"
   mv "$pending_main" "$install_dir/sync.mjs"
   pending_main=''
-  node "$script_dir/runtime-state.mjs" check "$install_dir" "$version"
+  node "$script_dir/runtime-state.mjs" check "$install_dir" "$version" >/dev/null
   node -e 'console.log(JSON.stringify({status:"installed",path:process.argv[1],requestedVersion:process.argv[2]}))' "$install_dir" "$version"
 )
 
