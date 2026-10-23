@@ -377,8 +377,9 @@ export async function main(argv = process.argv.slice(2), overrides = {}) {
 
       console.log('\nSync complete!');
       if (jsonOutput) _log(JSON.stringify(result));
-      // outer-boundary-process-contract: sync-tripit.sh reads JSON errors plus a nonzero
-      // exit as the failure signal. Emit both here; propagation would leave invalid JSON.
+      // outer-boundary-process-contract: run-sync.sh and the sync-tripit skill
+      // treat a nonzero exit or invalid JSON stdout as a failed run. Emit JSON
+      // errors, stderr and status 1 here; propagation would omit the JSON failure record.
     } catch (err) {
       const fatalMsg = err instanceof Error ? err.message : String(err);
       if (jsonOutput) {
