@@ -6,12 +6,14 @@
 node_modules/
 lib/
 sync.mjs
+sync.test.mjs
 package.json
 package-lock.json
 jsconfig.json
 eslint.config.mjs
 .prettierrc.json
 renovate.json
+.gitattributes
 
 # Container / deployment
 Dockerfile

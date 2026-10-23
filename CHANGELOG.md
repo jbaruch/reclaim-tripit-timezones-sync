@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.3.4 — 2026-10-23
+
+- Gate runtime changes with pinned formatting, lint, JavaScript diagnostics and
+  outcome tests. Package only plugin content, and publish packaging changes.
 
 - OOO calendar blocks are now anchored at **home-local midnight** instead of
   UTC midnight. A UTC-midnight block renders as the evening before in a
