@@ -79,4 +79,6 @@ jobs:
         # Publishes the version pinned in .tessl-plugin/plugin.json. Plugins
         # do not auto-bump the patch number, so the published version always
         # equals plugin.json — which is why the tag step above is exact.
-        run: tessl plugin publish
+        uses: jbaruch/coding-policy/.github/actions/smart-publish@62c957816d936a2bb97707d5cf457ded2418ebeb
+        with:
+          mode: as-is
