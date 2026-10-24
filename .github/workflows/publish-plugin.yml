@@ -54,6 +54,19 @@ jobs:
             echo "plugin.json version unchanged ($LOCAL_VERSION)"
           fi
 
+      - name: Install Tessl CLI
+        uses: tesslio/setup-tessl@v2
+        with:
+          token: ${{ secrets.TESSL_TOKEN }}
+
+      - name: Lint plugin
+        run: tessl plugin lint
+
+      - name: Review skills before publication
+        uses: jbaruch/coding-policy/.github/actions/skill-review@f396973a41c359b7ee00950b48817d9603563772
+        with:
+          threshold: '85'
+
       - name: Tag the bumped plugin.json version
         # Runs only when this push actually bumped the version. The in-skill
         # curl URL inside the bundle references vX.Y.Z, so tag this commit
@@ -71,19 +84,6 @@ jobs:
             git push origin "$TAG"
             echo "Created tag $TAG at this commit"
           fi
-
-      - name: Install Tessl CLI
-        uses: tesslio/setup-tessl@v2
-        with:
-          token: ${{ secrets.TESSL_TOKEN }}
-
-      - name: Lint plugin
-        run: tessl plugin lint
-
-      - name: Review skills before publication
-        uses: jbaruch/coding-policy/.github/actions/skill-review@f396973a41c359b7ee00950b48817d9603563772
-        with:
-          threshold: '85'
 
       - name: Publish plugin to Tessl registry
         # Publishes the version pinned in .tessl-plugin/plugin.json. Plugins
