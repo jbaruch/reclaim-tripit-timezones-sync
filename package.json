@@ -9,7 +9,10 @@
   "scripts": {
     "dry-run": "node sync.mjs dry-run",
     "sync": "node sync.mjs sync",
-    "test": "node --test lib/*.test.mjs"
+    "test": "node --test",
+    "typecheck": "tsc --noEmit -p jsconfig.json",
+    "lint": "eslint sync.mjs sync.test.mjs lib/ eslint.config.mjs",
+    "format:check": "prettier --check sync.mjs sync.test.mjs \"lib/*.mjs\" eslint.config.mjs .prettierrc.json jsconfig.json .github/renovate.json package.json"
   },
   "dependencies": {
     "geo-tz": "^8.1.1",
@@ -19,5 +22,13 @@
   },
   "optionalDependencies": {
     "@aws-sdk/client-sns": "^3.1004.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@types/node": "22.19.11",
+    "eslint": "9.39.4",
+    "globals": "15.15.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
   }
 }

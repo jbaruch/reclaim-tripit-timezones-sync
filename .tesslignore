@@ -26,3 +26,9 @@ AWS_DEPLOYMENT.md
 .github/
 scripts/
 .claude/
+
+# JavaScript diagnostic tooling and test entrypoint
+/eslint.config.mjs
+/.prettierrc.json
+/.gitattributes
+/sync.test.mjs
