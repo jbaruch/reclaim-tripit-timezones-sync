@@ -67,7 +67,7 @@ For valid JSON, retain any stderr diagnostic for the error report in Step 4.
   "segments": [
     { "timezone": "America/Chicago", "from": "2026-04-01", "to": "2026-04-05", "label": "KubeCon - Austin" }
   ],
-  "ooo": { "created": 2, "deleted": 1, "setToP2": 1 },
+  "ooo": { "created": 2, "deleted": 1, "setToP2": 1, "prioritySet": 1, "createdNames": ["KubeCon", "DevOps Days"], "deletedNames": ["Earlier trip"] },
   "conflicts": [
     { "trip1": "KubeCon", "trip2": "DevOps Days", "overlap": "2026-04-03" }
   ],
@@ -84,7 +84,7 @@ Proceed immediately to Step 4.
 
 **Report changes:**
 - `noChanges` is `false` → summarize `timezoneChanges` (group creates, mention deletes)
-- `ooo` is not null and has non-zero counts → mention OOO blocks created/deleted/prioritized
+- `ooo` is not null and has non-zero counts → name `createdNames` and `deletedNames` for the changed trips and mention `prioritySet` (legacy alias `setToP2`)
 - `conflicts` is non-empty → warn about overlapping trips with names and dates
 
 Note: `homeTimezone` is the resolved home timezone. Segments matching it are

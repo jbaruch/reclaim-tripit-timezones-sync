@@ -14,7 +14,7 @@ install_sync_main() (
     return 2
   fi
   local install_dir="${1:-$HOME/.tripit-reclaim}"
-  local version='0.3.4'
+  local version='0.3.5'
   if ! command -v node >/dev/null; then
     echo 'Install Node >=22.19.0 and retry install-sync.sh.' >&2
     return 1

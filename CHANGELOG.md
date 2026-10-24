@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.5 — 2026-10-23
+
+- Include named OOO changes and the prioritySet alias while preserving setToP2.
+- Preserve all-day trip dates across process timezones. Resolve Reclaim and OOO expiration at home-local midnight with a UTC fallback. Reconcile only active
+  overrides and OOO blocks, retaining the full JSON schedule. Create neighboring
+  overrides sequentially and report priority-only changes.
+
 ## 0.3.4 — 2026-10-23
 
 - Make onboarding install and validate through tested credential-safe helpers; recover publication tags after a review failure without moving existing tags. Parse runtime dotenv as data.

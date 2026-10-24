@@ -39,6 +39,25 @@ function fixture(t) {
   return { output, errors, dependencies, read: () => JSON.parse(output.join('\n')) };
 }
 
+/** @param {Array<{summary: string, start: string, end: string, geo?: string}>} rows */
+function tripFeed(rows) {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0'];
+  for (const [index, trip] of rows.entries()) {
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:fixture-trip-${index}`,
+      'DTSTAMP:20240101T000000Z',
+      `SUMMARY:${trip.summary}`,
+      `DTSTART;VALUE=DATE:${trip.start.replaceAll('-', '')}`,
+      `DTEND;VALUE=DATE:${trip.end.replaceAll('-', '')}`
+    );
+    if (trip.geo) lines.push(`GEO:${trip.geo}`);
+    lines.push('END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  return Object.values(ical.sync.parseICS(lines.join('\r\n'))).filter((event) => event.type === 'VEVENT');
+}
+
 describe('CLI orchestration outcomes', () => {
   /** @param {import('node:test').TestContext} t */
   function setup(t) {
@@ -67,6 +86,222 @@ describe('CLI orchestration outcomes', () => {
     t.mock.timers.enable({ apis: ['Date'], now: new Date('2024-01-01T00:00:00Z') });
   }
   beforeEach(setup);
+
+  /** @type {Array<[string, string, boolean]>} */
+  const reclaimMidnightCases = [
+    ['America/Chicago', '2024-06-10T04:59:00Z', true],
+    ['America/Chicago', '2024-06-10T05:00:00Z', false],
+    ['Europe/Brussels', '2024-06-09T21:59:00Z', true],
+    ['Europe/Brussels', '2024-06-09T22:00:00Z', false],
+    ['invalid-zone', '2024-06-10T00:00:00Z', false]
+  ];
+  for (const [zone, now, active] of reclaimMidnightCases) {
+    it(`notifies only active segments at the home-date boundary ${now} (${zone})`, async (t) => {
+      const f = fixture(t);
+      t.mock.timers.setTime(new Date(now).getTime());
+      let notified = false;
+      const expected = active ? ['Europe/Paris', 'Asia/Tokyo'] : ['Asia/Tokyo'];
+      const written = [];
+      assert.equal(
+        await main(['sync', '--output=json'], {
+          ...f.dependencies,
+          fetchIcalEvents: async () =>
+            tripFeed([
+              { summary: 'Paris', start: '2024-06-08', end: '2024-06-10', geo: '48.8566;2.3522' },
+              { summary: 'Tokyo', start: '2024-06-12', end: '2024-06-14', geo: '35.6762;139.6503' }
+            ]),
+          listEntries: async () => ({ entries: [], defaultTimezone: zone }),
+          clearAllEntries: async () => {},
+          createEntry: async (_client, entry) => {
+            written.push(entry);
+            return { id: 1 };
+          },
+          sendNotification: async (_previous, newSegments, rawSegments) => {
+            notified = true;
+            assert.deepEqual(
+              rawSegments.map((segment) => segment.timezone),
+              expected
+            );
+            assert.deepEqual(
+              newSegments.map((segment) => segment.timezone),
+              expected
+            );
+          }
+        }),
+        0,
+        JSON.stringify(f.read().errors)
+      );
+      assert.equal(notified, true);
+      assert.equal(written.length, expected.length);
+      assert.equal(f.read().noChanges, false);
+    });
+    it(`reconciles Reclaim using home-local midnight at ${now} (${zone})`, async (t) => {
+      const f = fixture(t);
+      t.mock.timers.setTime(new Date(now).getTime());
+      const events = tripFeed([{ summary: 'Paris', start: '2024-06-08', end: '2024-06-10', geo: '48.8566;2.3522' }]);
+      assert.equal(
+        await main(['sync', '--output=json'], {
+          ...f.dependencies,
+          fetchIcalEvents: async () => events,
+          listEntries: async () => ({
+            entries: active
+              ? [{ id: 1, startDate: '2024-06-08', endDate: '2024-06-10', timezone: 'Europe/Paris' }]
+              : [],
+            defaultTimezone: zone
+          })
+        }),
+        0
+      );
+      assert.equal(f.read().noChanges, true);
+      assert.deepEqual(f.read().timezoneChanges, []);
+      assert.equal(f.read().segments.length, 1);
+      assert.equal(f.dependencies.clearAllEntries.mock.callCount(), 0);
+      assert.equal(f.dependencies.createEntry.mock.callCount(), 0);
+    });
+  }
+
+  it('keeps an ending segment in JSON without rewriting the matching active Reclaim entries', async (t) => {
+    const f = fixture(t);
+    t.mock.timers.setTime(new Date('2024-06-10T12:00:00Z').getTime());
+    const events = tripFeed([
+      { summary: 'Paris', start: '2024-06-09', end: '2024-06-10', geo: '48.8566;2.3522' },
+      { summary: 'New York', start: '2024-06-10', end: '2024-06-12', geo: '40.7128;-74.0060' }
+    ]);
+    assert.equal(
+      await main(['sync', '--output=json'], {
+        ...f.dependencies,
+        fetchIcalEvents: async () => events,
+        listEntries: async () => ({
+          entries: [{ id: 1, startDate: '2024-06-10', endDate: '2024-06-12', timezone: 'America/New_York' }],
+          defaultTimezone: 'America/Chicago'
+        })
+      }),
+      0
+    );
+    assert.equal(f.read().noChanges, true);
+    assert.deepEqual(f.read().timezoneChanges, []);
+    assert.deepEqual(
+      f.read().segments.map(({ from, to, timezone }) => ({ from, to, timezone })),
+      [
+        { from: '2024-06-09', to: '2024-06-10', timezone: 'Europe/Paris' },
+        { from: '2024-06-10', to: '2024-06-12', timezone: 'America/New_York' }
+      ]
+    );
+    assert.equal(f.dependencies.clearAllEntries.mock.callCount(), 0);
+    assert.equal(f.dependencies.createEntry.mock.callCount(), 0);
+  });
+
+  for (const failSecond of [false, true]) {
+    it(`settles adjacent Reclaim creates in order and reports acknowledged writes (failure=${failSecond})`, async (t) => {
+      const f = fixture(t);
+      const events = tripFeed([
+        { summary: 'Paris', start: '2024-06-10', end: '2024-06-12', geo: '48.8566;2.3522' },
+        { summary: 'New York', start: '2024-06-12', end: '2024-06-14', geo: '40.7128;-74.0060' }
+      ]);
+      const completed = [];
+      let inFlight = false;
+      const status = await main(['sync', '--output=json'], {
+        ...f.dependencies,
+        fetchIcalEvents: async () => events,
+        clearAllEntries: async () => {},
+        createEntry: async (client, entry) => {
+          assert.ok(client.headers);
+          assert.equal(inFlight, false, 'provider rejects a create while its neighbor is unsettled');
+          inFlight = true;
+          await new Promise((resolve) => setImmediate(resolve));
+          if (failSecond && completed.length === 1) throw new Error('Fixture second create refused');
+          completed.push(entry);
+          inFlight = false;
+          return { id: completed.length };
+        },
+        sendNotification: async () => {}
+      });
+      assert.equal(status, failSecond ? 1 : 0);
+      assert.deepEqual(completed, [
+        { startDate: '2024-06-10', endDate: '2024-06-12', timezone: 'Europe/Paris' },
+        ...(!failSecond ? [{ startDate: '2024-06-12', endDate: '2024-06-14', timezone: 'America/New_York' }] : [])
+      ]);
+      assert.equal(f.read().timezoneChanges.length, completed.length);
+      assert.equal(f.read().noChanges, false);
+      assert.deepEqual(f.read().errors, failSecond ? ['Fixture second create refused'] : []);
+    });
+  }
+
+  /** @type {Array<[string, string, boolean]>} */
+  const midnightCases = [
+    ['America/Chicago', '2024-06-10T04:59:00Z', true],
+    ['America/Chicago', '2024-06-10T05:00:00Z', false],
+    ['Europe/Brussels', '2024-06-09T22:00:00Z', false]
+  ];
+  for (const [zone, now, stillActive] of midnightCases) {
+    it(`does not recreate an expired OOO at ${now} (${zone})`, async (t) => {
+      const f = fixture(t);
+      t.mock.timers.setTime(new Date(now).getTime());
+      process.env.GOOGLE_CLIENT_ID = 'fixture-client';
+      process.env.GOOGLE_CLIENT_SECRET = 'fixture-secret';
+      process.env.GOOGLE_REFRESH_TOKEN = 'fixture-refresh';
+      const events = tripFeed([{ summary: 'One night', start: '2024-06-09', end: '2024-06-10' }]);
+      assert.equal(
+        await main(['sync', '--output=json'], {
+          ...f.dependencies,
+          fetchIcalEvents: async () => events,
+          listEntries: async () => ({ entries: [], defaultTimezone: zone }),
+          getPrimaryCalendar: async () => ({ calendarId: 1, googleCalendarId: 'fixture@example.invalid' }),
+          listOooEvents: async () =>
+            stillActive
+              ? [{ id: 'existing', summary: '[TripIt OOO] One night', startDate: '2024-06-09', endDate: '2024-06-10' }]
+              : [],
+          listReclaimEvents: async () => [{ eventId: 8, title: '[TripIt OOO] One night', priority: 'P2' }]
+        }),
+        0
+      );
+      assert.equal(f.read().noChanges, true);
+      assert.deepEqual(f.read().ooo, {
+        created: 0,
+        deleted: 0,
+        setToP2: 0,
+        prioritySet: 0,
+        createdNames: [],
+        deletedNames: []
+      });
+      assert.equal(f.dependencies.createOooEvent.mock.callCount(), 0);
+      assert.equal(f.dependencies.deleteOooEvent.mock.callCount(), 0);
+    });
+  }
+
+  it('reports priority-only OOO changes as a real change with both counter names', async (t) => {
+    const f = fixture(t);
+    process.env.GOOGLE_CLIENT_ID = 'fixture-client';
+    process.env.GOOGLE_CLIENT_SECRET = 'fixture-secret';
+    process.env.GOOGLE_REFRESH_TOKEN = 'fixture-refresh';
+    const setPriority = t.mock.fn(async () => {});
+    const notify = t.mock.fn(async () => {});
+    assert.equal(
+      await main(['sync', '--output=json'], {
+        ...f.dependencies,
+        fetchIcalEvents: async () => tripFeed([{ summary: 'Conference', start: '2024-06-10', end: '2024-06-12' }]),
+        getPrimaryCalendar: async () => ({ calendarId: 1, googleCalendarId: 'fixture@example.invalid' }),
+        listOooEvents: async () => [
+          { id: 'existing', summary: '[TripIt OOO] Conference', startDate: '2024-06-10', endDate: '2024-06-12' }
+        ],
+        listReclaimEvents: async () => [{ eventId: 8, title: '[TripIt OOO] Conference', priority: 'P3' }],
+        setEventPriority: setPriority,
+        sendNotification: notify
+      }),
+      0
+    );
+    assert.equal(f.read().noChanges, false);
+    assert.deepEqual(f.read().ooo, {
+      created: 0,
+      deleted: 0,
+      setToP2: 1,
+      prioritySet: 1,
+      createdNames: [],
+      deletedNames: []
+    });
+    assert.equal(setPriority.mock.callCount(), 1);
+    assert.equal(notify.mock.callCount(), 1);
+  });
 
   it('imports without parsing arguments, producing output or exiting', () => {
     const imported = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./sync.mjs')"], {
@@ -363,7 +598,14 @@ describe('CLI orchestration outcomes', () => {
       0
     );
     const result = f.read();
-    assert.deepEqual(result.ooo, { created: 1, deleted: 1, setToP2: 1 });
+    assert.deepEqual(result.ooo, {
+      created: 1,
+      deleted: 1,
+      setToP2: 1,
+      prioritySet: 1,
+      createdNames: ['Conference'],
+      deletedNames: ['Old trip']
+    });
     assert.equal(result.noChanges, false);
     assert.deepEqual(create.mock.calls[0].arguments[2], {
       summary: 'Conference',
