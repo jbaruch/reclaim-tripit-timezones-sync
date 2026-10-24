@@ -2,6 +2,8 @@
 
 ## 0.3.4 — 2026-10-23
 
+- Make onboarding install and validate through tested credential-safe helpers; recover publication tags after a review failure without moving existing tags. Parse runtime dotenv as data.
+
 - Gate runtime changes with pinned formatting, lint, JavaScript diagnostics and
   outcome tests. Package only plugin content, and publish packaging changes.
 - Delegate sync installation and execution to guarded, tested scripts. Keep
