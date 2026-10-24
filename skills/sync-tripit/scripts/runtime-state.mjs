@@ -134,6 +134,38 @@ export function main(args = process.argv.slice(2)) {
   }
 }
 
+/** Fixed diagnostic vocabulary and an owner-source location, never raw error text. */
+export function verificationDiagnostic(error) {
+  const types = [SyntaxError, TypeError, RangeError, ReferenceError, URIError, EvalError, Error];
+  const failureKind = types.find((type) => error instanceof type)?.name ?? 'non-Error';
+  const codes = ['ENOENT', 'ENOTDIR', 'EACCES', 'EPERM', 'ELOOP', 'EIO', 'ENOSPC', 'EROFS', 'EMFILE', 'ENFILE'];
+  const failureCode =
+    error instanceof Error && 'code' in error && codes.includes(String(error.code))
+      ? String(error.code)
+      : 'unclassified';
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  const markers = [
+    'permission denied',
+    'read-only',
+    'disk full',
+    'no such file',
+    'not a directory',
+    'invalid json',
+    'cannot find module',
+    'module not found'
+  ];
+  const failureMessage =
+    markers.filter((marker) => message.includes(marker)).join(', ') ||
+    'No recognized operational marker; inspect helper and dependency metadata.';
+  const frame = error instanceof Error ? /runtime-state\.mjs:(\d+):(\d+)/.exec(error.stack ?? '') : null;
+  return {
+    failureKind,
+    failureCode,
+    failureMessage,
+    failureLocation: frame ? `runtime-state.mjs:${frame[1]}:${frame[2]}` : 'unavailable'
+  };
+}
+
 if (
   process.argv[1] &&
   existsSync(process.argv[1]) &&
@@ -153,11 +185,12 @@ if (
         requestedVersion: process.argv[4],
         ready: false,
         error: 'runtime-verification-failed',
-        failureKind: error instanceof Error ? 'Error' : 'non-Error'
+        ...verificationDiagnostic(error)
       })
     );
+    const diagnostic = verificationDiagnostic(error);
     console.error(
-      'Runtime verification failed unexpectedly; inspect directory permissions and the runtime-state helper before retrying install-sync.sh.'
+      `Runtime verification failed unexpectedly (${diagnostic.failureKind}, ${diagnostic.failureCode}, ${diagnostic.failureLocation}: ${diagnostic.failureMessage}); inspect directory permissions and the runtime-state helper before retrying install-sync.sh.`
     );
     process.exitCode = 3;
   }
