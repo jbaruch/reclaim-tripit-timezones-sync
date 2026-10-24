@@ -6,9 +6,14 @@
 node_modules/
 lib/
 sync.mjs
+sync.test.mjs
 package.json
 package-lock.json
 jsconfig.json
+eslint.config.mjs
+.prettierrc.json
+renovate.json
+.gitattributes
 
 # Container / deployment
 Dockerfile
@@ -24,11 +29,8 @@ AWS_DEPLOYMENT.md
 
 # Repo infra (not plugin content)
 .github/
-scripts/
+/scripts/
 .claude/
 
-# JavaScript diagnostic tooling and test entrypoint
-/eslint.config.mjs
-/.prettierrc.json
-/.gitattributes
-/sync.test.mjs
+# Runtime installer fixtures run in CI, not in the installed skill.
+skills/**/*.test.mjs

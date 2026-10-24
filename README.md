@@ -281,8 +281,9 @@ the exact version the plugin expects rather than whatever happens to be on
 
 `.github/workflows/publish-plugin.yml` runs on every push to `main` that
 touches the plugin content (`.tessl-plugin/**`, `rules/**`, `skills/**`,
-`evals/**`, `README.md`). It uses [`tesslio/setup-tessl`][gha] to install
-the Tessl CLI, then runs `tessl plugin lint` and `tessl plugin publish`.
+`evals/**`, `README.md`, `.tesslignore`). It uses [`tesslio/setup-tessl`][gha]
+to install the Tessl CLI, then runs plugin lint, the changed-skills review
+gate at threshold 85, and `tessl plugin publish`.
 
 The published version is always exactly what's in `.tessl-plugin/plugin.json`
 — unlike tiles, plugin publish does not auto-bump the patch number. So the
