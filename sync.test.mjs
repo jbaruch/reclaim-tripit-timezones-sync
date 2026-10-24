@@ -96,6 +96,45 @@ describe('CLI orchestration outcomes', () => {
     ['invalid-zone', '2024-06-10T00:00:00Z', false]
   ];
   for (const [zone, now, active] of reclaimMidnightCases) {
+    it(`notifies only active segments at the home-date boundary ${now} (${zone})`, async (t) => {
+      const f = fixture(t);
+      t.mock.timers.setTime(new Date(now).getTime());
+      let notified = false;
+      const expected = active ? ['Europe/Paris', 'Asia/Tokyo'] : ['Asia/Tokyo'];
+      const written = [];
+      assert.equal(
+        await main(['sync', '--output=json'], {
+          ...f.dependencies,
+          fetchIcalEvents: async () =>
+            tripFeed([
+              { summary: 'Paris', start: '2024-06-08', end: '2024-06-10', geo: '48.8566;2.3522' },
+              { summary: 'Tokyo', start: '2024-06-12', end: '2024-06-14', geo: '35.6762;139.6503' }
+            ]),
+          listEntries: async () => ({ entries: [], defaultTimezone: zone }),
+          clearAllEntries: async () => {},
+          createEntry: async (_client, entry) => {
+            written.push(entry);
+            return { id: 1 };
+          },
+          sendNotification: async (_previous, newSegments, rawSegments) => {
+            notified = true;
+            assert.deepEqual(
+              rawSegments.map((segment) => segment.timezone),
+              expected
+            );
+            assert.deepEqual(
+              newSegments.map((segment) => segment.timezone),
+              expected
+            );
+          }
+        }),
+        0,
+        JSON.stringify(f.read().errors)
+      );
+      assert.equal(notified, true);
+      assert.equal(written.length, expected.length);
+      assert.equal(f.read().noChanges, false);
+    });
     it(`reconciles Reclaim using home-local midnight at ${now} (${zone})`, async (t) => {
       const f = fixture(t);
       t.mock.timers.setTime(new Date(now).getTime());

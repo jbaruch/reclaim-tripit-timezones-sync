@@ -378,7 +378,12 @@ export async function main(argv = process.argv.slice(2), overrides = {}) {
 
       // Notify on changes (never throws)
       if (timezoneChanged || (oooStats && (oooStats.created > 0 || oooStats.deleted > 0 || oooStats.prioritySet > 0))) {
-        await sendNotification(previousEntries, reclaimSegments, filterReclaimSegments(future, today), oooStats);
+        await sendNotification(
+          previousEntries,
+          reclaimSegments,
+          filterReclaimSegments(future, homeCalendarDate),
+          oooStats
+        );
       }
 
       console.log('\nSync complete!');
