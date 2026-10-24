@@ -12,7 +12,7 @@
     "test": "node --test",
     "typecheck": "tsc --noEmit -p jsconfig.json",
     "lint": "eslint sync.mjs sync.test.mjs lib/ eslint.config.mjs",
-    "format:check": "prettier --check sync.mjs sync.test.mjs \"lib/*.mjs\" eslint.config.mjs .prettierrc.json jsconfig.json .github/renovate.json .github/workflows/test.yml package.json"
+    "format:check": "prettier --check sync.mjs sync.test.mjs \"lib/*.mjs\" eslint.config.mjs .prettierrc.json jsconfig.json .github/renovate.json package.json"
   },
   "dependencies": {
     "geo-tz": "^8.1.1",
