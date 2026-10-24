@@ -5,6 +5,7 @@ import {
   mkdirSync,
   writeFileSync,
   readFileSync,
+  readdirSync,
   existsSync,
   rmSync,
   symlinkSync,
@@ -442,6 +443,76 @@ function releaseFixture(t) {
 }
 
 describe('release version synchronization', () => {
+  for (const phase of ['staging', 'replacement']) {
+    for (const code of ['EACCES', 'ENOSPC', 'EROFS']) {
+      it(`preserves every release source on ${phase} ${code}`, (t) => {
+        const f = releaseFixture(t);
+        const files = [
+          '.tessl-plugin/plugin.json',
+          'skills/sync-tripit/scripts/install-sync.sh',
+          'evals/sync-library-installation-and-execution/criteria.json',
+          'research.md'
+        ];
+        const before = files.map((file) => readFileSync(join(f.releaseRoot, file), 'utf8'));
+        const preload = join(f.root, 'write-failure.mjs');
+        const operation = phase === 'staging' ? 'writeFileSync' : 'renameSync';
+        writeFileSync(
+          preload,
+          `import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+const original=fs.${operation};fs.${operation}=function(path,...args){if(String(path).endsWith('/next-1'))throw Object.assign(new Error('private write fixture'),{code:${JSON.stringify(code)}});return original.call(this,path,...args);};syncBuiltinESMExports();`
+        );
+        const run = spawnSync('bash', [f.script, '4.5.6'], {
+          env: { ...process.env, NODE_OPTIONS: `--import=${preload}` },
+          encoding: 'utf8'
+        });
+        assert.equal(run.status, 1);
+        assert.equal(run.stdout, '');
+        assert.match(run.stderr, /original files are preserved.*write permissions.*disk space.*retry/);
+        assert.doesNotMatch(run.stderr, /private write fixture|at replaceSourceSet/);
+        assert.deepEqual(
+          files.map((file) => readFileSync(join(f.releaseRoot, file), 'utf8')),
+          before
+        );
+        assert.equal(
+          readdirSync(f.releaseRoot).some((name) => name.startsWith('.release-version-')),
+          false
+        );
+      });
+    }
+  }
+
+  it('keeps recovery originals and an actionable journal when rollback is denied', (t) => {
+    const f = releaseFixture(t);
+    const installerBefore = readFileSync(join(f.releaseRoot, 'skills/sync-tripit/scripts/install-sync.sh'), 'utf8');
+    const preload = join(f.root, 'rollback-failure.mjs');
+    writeFileSync(
+      preload,
+      `import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+const original=fs.renameSync;fs.renameSync=function(path,...args){if(['/next-1','/original-0'].some(suffix=>String(path).endsWith(suffix)))throw Object.assign(new Error('private rollback fixture'),{code:'EACCES'});return original.call(this,path,...args);};syncBuiltinESMExports();`
+    );
+    const run = spawnSync('bash', [f.script, '4.5.6'], {
+      env: { ...process.env, NODE_OPTIONS: `--import=${preload}` },
+      encoding: 'utf8'
+    });
+    assert.equal(run.status, 1);
+    assert.equal(run.stdout, '');
+    assert.match(run.stderr, /Preserve .*restore its original files using recovery.json.*retry/);
+    assert.doesNotMatch(run.stderr, /private rollback fixture|at replaceSourceSet/);
+    const name = readdirSync(f.releaseRoot).find((entry) => entry.startsWith('.release-version-'));
+    assert.ok(name);
+    const recovery = join(f.releaseRoot, name);
+    assert.equal(readFileSync(join(recovery, 'original-0'), 'utf8'), installerBefore);
+    const journal = JSON.parse(readFileSync(join(recovery, 'recovery.json'), 'utf8'));
+    assert.equal(journal.schema_version, 1);
+    assert.equal(journal.files.length, 4);
+    const beforeRetry = readFileSync(join(f.releaseRoot, 'skills/sync-tripit/scripts/install-sync.sh'), 'utf8');
+    const retry = spawnSync('bash', [f.script, '4.5.6'], { env: process.env, encoding: 'utf8' });
+    assert.equal(retry.status, 1);
+    assert.equal(retry.stdout, '');
+    assert.match(retry.stderr, /previous release update needs recovery.*before retrying/);
+    assert.equal(readFileSync(join(f.releaseRoot, 'skills/sync-tripit/scripts/install-sync.sh'), 'utf8'), beforeRetry);
+  });
+
   for (const file of [
     '.tessl-plugin/plugin.json',
     'skills/sync-tripit/scripts/install-sync.sh',
