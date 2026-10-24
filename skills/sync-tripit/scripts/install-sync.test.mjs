@@ -442,6 +442,58 @@ function releaseFixture(t) {
 }
 
 describe('release version synchronization', () => {
+  for (const file of [
+    '.tessl-plugin/plugin.json',
+    'skills/sync-tripit/scripts/install-sync.sh',
+    'evals/sync-library-installation-and-execution/criteria.json',
+    'research.md'
+  ]) {
+    for (const code of ['ENOENT', 'EACCES']) {
+      it(`reports actionable ${code} for ${file} without changing the source set`, (t) => {
+        const f = releaseFixture(t);
+        const manifestBefore = readFileSync(join(f.releaseRoot, '.tessl-plugin/plugin.json'), 'utf8');
+        const installerBefore = readFileSync(join(f.releaseRoot, 'skills/sync-tripit/scripts/install-sync.sh'), 'utf8');
+        const preload = join(f.root, 'read-failure.mjs');
+        writeFileSync(
+          preload,
+          `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
+const original=fs.readFileSync;fs.readFileSync=function(path,...args){if(String(path)===${JSON.stringify(realpathSync(join(f.releaseRoot, file)))})throw Object.assign(new Error('private source fixture'),{code:${JSON.stringify(code)}});return original.call(this,path,...args);};syncBuiltinESMExports();`
+        );
+        const run = spawnSync('bash', [f.script, '4.5.6'], {
+          cwd: f.root,
+          env: { ...process.env, NODE_OPTIONS: `--import=${preload}` },
+          encoding: 'utf8'
+        });
+        assert.equal(run.status, 1);
+        assert.equal(run.stdout, '');
+        assert.ok(run.stderr.includes(file));
+        assert.match(run.stderr, /restore.*read permissions.*retry/);
+        assert.doesNotMatch(run.stderr, /private source fixture|at readSource/);
+        assert.equal(readFileSync(join(f.releaseRoot, '.tessl-plugin/plugin.json'), 'utf8'), manifestBefore);
+        assert.equal(
+          readFileSync(join(f.releaseRoot, 'skills/sync-tripit/scripts/install-sync.sh'), 'utf8'),
+          installerBefore
+        );
+      });
+    }
+  }
+
+  it('reports safe verifier type, filesystem detail and owner location without raw payloads', async () => {
+    const { verificationDiagnostic } = await import('./runtime-state.mjs');
+    const error = Object.assign(new TypeError('permission denied: private credential fixture'), {
+      code: 'EACCES',
+      stack: 'TypeError: private credential fixture\n at readJson (file:///private/runtime-state.mjs:24:5)'
+    });
+    const diagnostic = verificationDiagnostic(error);
+    assert.deepEqual(diagnostic, {
+      failureKind: 'TypeError',
+      failureCode: 'EACCES',
+      failureMessage: 'permission denied',
+      failureLocation: 'runtime-state.mjs:24:5'
+    });
+    assert.ok(!JSON.stringify(diagnostic).includes('private credential fixture'));
+  });
+
   it('reports malformed manifest JSON without changing release sources', (t) => {
     const f = releaseFixture(t);
     const files = [

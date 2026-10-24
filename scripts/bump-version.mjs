@@ -4,6 +4,22 @@ import { fileURLToPath } from 'node:url';
 
 class VersionSourceError extends Error {}
 
+function readSource(root, file) {
+  try {
+    return fs.readFileSync(path.join(root, file), 'utf8');
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !('code' in error) ||
+      !['ENOENT', 'ENOTDIR', 'EACCES', 'EPERM', 'EISDIR', 'ELOOP'].includes(String(error.code))
+    )
+      throw error;
+    throw new VersionSourceError(
+      `Cannot read ${file}; restore this release source and its read permissions, then retry the release bump.`
+    );
+  }
+}
+
 /**
  * Validate the complete source set before changing any release version.
  * @param {string[]} [argv]
@@ -20,7 +36,7 @@ export function main(argv = process.argv.slice(2), root = fileURLToPath(new URL(
   const archiveFiles = ['evals/sync-library-installation-and-execution/criteria.json', 'research.md'];
   let manifest;
   try {
-    manifest = JSON.parse(fs.readFileSync(path.join(root, manifestPath), 'utf8'));
+    manifest = JSON.parse(readSource(root, manifestPath));
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
     throw new VersionSourceError(`Restore valid JSON in ${manifestPath}, then retry the release bump.`);
@@ -28,7 +44,7 @@ export function main(argv = process.argv.slice(2), root = fileURLToPath(new URL(
   if (!manifest || typeof manifest !== 'object' || typeof manifest.version !== 'string') {
     throw new VersionSourceError(`Restore the version field in ${manifestPath}, then retry the release bump.`);
   }
-  const installer = fs.readFileSync(path.join(root, installerPath), 'utf8');
+  const installer = readSource(root, installerPath);
   const versionPattern = /local version='\d+\.\d+\.\d+'/g;
   if ([...installer.matchAll(versionPattern)].length !== 1) {
     throw new VersionSourceError(
@@ -37,7 +53,7 @@ export function main(argv = process.argv.slice(2), root = fileURLToPath(new URL(
   }
   const changes = new Map([[installerPath, installer.replace(versionPattern, `local version='${version}'`)]]);
   for (const file of archiveFiles) {
-    const text = fs.readFileSync(path.join(root, file), 'utf8');
+    const text = readSource(root, file);
     const archivePattern = /archive\/refs\/tags\/v\d+\.\d+\.\d+\.tar\.gz/g;
     if (![...text.matchAll(archivePattern)].length) {
       throw new VersionSourceError(`Restore the pinned archive URL in ${file}, then retry the release bump.`);
