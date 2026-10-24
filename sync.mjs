@@ -27,7 +27,8 @@ import {
   createEntry,
   getPrimaryCalendar,
   listReclaimEvents,
-  setEventPriority
+  setEventPriority,
+  ReclaimApiError
 } from './lib/reclaim.mjs';
 
 import {
@@ -124,7 +125,9 @@ export async function main(argv = process.argv.slice(2), overrides = {}) {
         result.errors.push('Missing TRIPIT_ICAL_URL environment variable');
         _log(JSON.stringify(result));
       }
-      _error('Missing TRIPIT_ICAL_URL environment variable');
+      _error(
+        'Missing TRIPIT_ICAL_URL environment variable; configure the TripIt feed through OneCLI or the local .env file, then retry.'
+      );
       return 1;
     }
 
@@ -133,7 +136,9 @@ export async function main(argv = process.argv.slice(2), overrides = {}) {
         result.errors.push('Missing RECLAIM_API_TOKEN environment variable');
         _log(JSON.stringify(result));
       }
-      _error('Missing RECLAIM_API_TOKEN environment variable');
+      _error(
+        'Missing RECLAIM_API_TOKEN environment variable; configure the Reclaim connection through OneCLI or the local .env file, then retry.'
+      );
       return 1;
     }
 
@@ -496,6 +501,7 @@ export async function main(argv = process.argv.slice(2), overrides = {}) {
           await setEventPriority(reclaimClient, calendarId, ev.eventId, 'P2');
           stats.prioritySet++;
         } catch (err) {
+          if (!(err instanceof ReclaimApiError)) throw err;
           console.log(`  WARNING: Failed to set priority for "${ev.title}": ${err.message}`);
         }
       }
@@ -505,6 +511,7 @@ export async function main(argv = process.argv.slice(2), overrides = {}) {
       const missing = futureTrips.filter((t) => !foundNames.has(`${OOO_PREFIX}${t.summary}`));
       return missing.length;
     } catch (err) {
+      if (!(err instanceof ReclaimApiError)) throw err;
       console.log(`  WARNING: Could not list Reclaim events for priority update: ${err.message}`);
       return futureTrips.length;
     }

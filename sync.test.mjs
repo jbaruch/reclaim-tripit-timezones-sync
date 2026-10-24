@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { main } from './sync.mjs';
+import { ReclaimApiError } from './lib/reclaim.mjs';
 import ical from 'node-ical';
 
 /** @param {import('node:test').TestContext} t */
@@ -263,6 +264,55 @@ describe('CLI orchestration outcomes', () => {
       assert.equal(console.log, log);
       assert.equal(f.dependencies.clearAllEntries.mock.callCount(), 0);
     });
+  }
+
+  for (const failed of ['listReclaimEvents', 'setEventPriority']) {
+    for (const expected of [false, true]) {
+      it(`propagates programming faults and warns only for known provider failures: ${failed}/${expected}`, async (t) => {
+        const f = fixture(t);
+        process.env.GOOGLE_CLIENT_ID = 'fixture-client';
+        process.env.GOOGLE_CLIENT_SECRET = 'fixture-secret';
+        process.env.GOOGLE_REFRESH_TOKEN = 'fixture-refresh';
+        const events = Object.values(
+          ical.sync.parseICS(
+            [
+              'BEGIN:VCALENDAR',
+              'VERSION:2.0',
+              'BEGIN:VEVENT',
+              'UID:fixture-conference',
+              'DTSTAMP:20240101T000000Z',
+              'SUMMARY:Conference',
+              'DTSTART;VALUE=DATE:20240110',
+              'DTEND;VALUE=DATE:20240112',
+              'END:VEVENT',
+              'END:VCALENDAR'
+            ].join('\r\n')
+          )
+        ).filter((event) => event.type === 'VEVENT');
+        const error = expected
+          ? new ReclaimApiError('Fixture provider unavailable; retry.')
+          : new TypeError('Fixture programming fault');
+        const status = await main(['sync', '--output=json'], {
+          ...f.dependencies,
+          fetchIcalEvents: async () => events,
+          getPrimaryCalendar: async () => ({ calendarId: 1, googleCalendarId: 'fixture@example.invalid' }),
+          listOooEvents: async () => [
+            { id: 'existing-event', summary: '[TripIt OOO] Conference', startDate: '2024-01-10', endDate: '2024-01-12' }
+          ],
+          listReclaimEvents: async () => [
+            { eventId: 'existing-event', title: '[TripIt OOO] Conference', priority: 'P3' }
+          ],
+          setEventPriority: async () => {},
+          [failed]: async () => {
+            throw error;
+          }
+        });
+        assert.equal(status, expected ? 0 : 1);
+        assert.deepEqual(f.read().errors, expected ? [] : ['Fixture programming fault']);
+        assert.equal(f.dependencies.createOooEvent.mock.callCount(), 0);
+        assert.equal(f.dependencies.deleteOooEvent.mock.callCount(), 0);
+      });
+    }
   }
 
   it('syncs OOO changes, sets priority and sends the completed outcome', async (t) => {
