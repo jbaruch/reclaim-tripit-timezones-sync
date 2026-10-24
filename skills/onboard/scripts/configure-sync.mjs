@@ -148,7 +148,7 @@ export function main(args = process.argv.slice(2)) {
           'Set the missing variables privately in the file or environment, then retry configuration.',
           { missing }
         );
-      if (source) store(directory, selected);
+      if (source && Object.keys(selected).length) store(directory, selected);
       console.log(
         JSON.stringify({
           schema_version: 1,

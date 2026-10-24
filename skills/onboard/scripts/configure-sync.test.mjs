@@ -147,4 +147,13 @@ describe('private onboarding outcomes', () => {
     const actual = spawnSync('bash', [runner, install], { env, encoding: 'utf8' });
     assert.equal(actual.status, 0, actual.stderr);
   });
+  it('preserves stored configuration when inherited credentials accompany an unrelated source file', () => {
+    fs.mkdirSync(install);
+    fs.writeFileSync(path.join(install, '.env'), 'HOME_TZ=America/Chicago\n');
+    fs.writeFileSync(source, 'UNRELATED_SETTING=fixture\n');
+    env.TRIPIT_ICAL_URL = 'inherited-feed-fixture';
+    env.RECLAIM_API_TOKEN = 'inherited-token-fixture';
+    assert.equal(run('configure', source, install).status, 0);
+    assert.equal(fs.readFileSync(path.join(install, '.env'), 'utf8'), 'HOME_TZ=America/Chicago\n');
+  });
 });
