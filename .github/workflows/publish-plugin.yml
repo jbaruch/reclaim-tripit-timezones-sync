@@ -55,7 +55,7 @@ jobs:
           fi
 
       - name: Install Tessl CLI
-        uses: tesslio/setup-tessl@v2
+        uses: tesslio/setup-tessl@25ec223fc0da33b41b8044ff5ab2b85235f4f91e # v2; Renovate renews GitHub Actions pins.
         with:
           token: ${{ secrets.TESSL_TOKEN }}
 
