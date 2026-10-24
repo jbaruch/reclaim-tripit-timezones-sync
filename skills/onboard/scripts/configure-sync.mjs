@@ -106,11 +106,13 @@ function store(directory, selected) {
 export function main(args = process.argv.slice(2)) {
   const [operation, first, second] = args;
   if (!['configure', 'verify'].includes(operation) || args.length > (operation === 'configure' ? 3 : 2)) {
+    const message = 'Use configure [SOURCE_FILE] [INSTALL_DIR] or verify [INSTALL_DIR].';
+    console.error(message);
     console.log(
       JSON.stringify({
         schema_version: 1,
         ok: false,
-        error: 'Use configure [SOURCE_FILE] [INSTALL_DIR] or verify [INSTALL_DIR].'
+        error: message
       })
     );
     return 2;
@@ -207,6 +209,7 @@ export function main(args = process.argv.slice(2)) {
       error instanceof ConfigurationError
         ? error.message
         : 'Cannot read or store the file. Repair dotenv syntax, permissions and disk space, then retry configuration.';
+    console.error(message);
     console.log(
       JSON.stringify({
         schema_version: 1,

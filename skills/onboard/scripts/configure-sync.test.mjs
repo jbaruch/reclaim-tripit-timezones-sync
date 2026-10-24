@@ -45,6 +45,12 @@ function runtime(code = 'console.log(JSON.stringify({errors:[],mode:process.argv
 }
 
 describe('private onboarding outcomes', () => {
+  it('emits actionable stderr and structured stdout for invalid arguments', () => {
+    const result = run('unknown');
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Use configure.*verify/);
+    assert.equal(JSON.parse(result.stdout).ok, false);
+  });
   it('stores only declared fields, preserves values and emits no credentials', () => {
     input('HOME_TZ=America/Chicago\nTELEGRAM_BOT_TOKEN=unrelated-fixture\n');
     const result = run('configure', source, install);
@@ -68,6 +74,7 @@ describe('private onboarding outcomes', () => {
     const result = run('configure', source, install);
     assert.equal(result.status, 1);
     assert.deepEqual(JSON.parse(result.stdout).missing, ['RECLAIM_API_TOKEN']);
+    assert.match(result.stderr, /Set the missing variables privately/);
     assert.doesNotMatch(result.stdout + result.stderr, /private-incomplete-fixture/);
     assert.equal(fs.readFileSync(path.join(install, '.env'), 'utf8'), 'PREVIOUS=keep');
   });

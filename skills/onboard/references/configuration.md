@@ -8,7 +8,8 @@ storage and verification. It reads dotenv as data and emits schema-1 JSON.
 
 Exit 0 returns `ok`, `operation`, `path`, variable names and feature flags.
 Exit 1 returns a safe `error`, optional `missing` names or `missingSource`.
-Exit 2 identifies invalid arguments. Source values never appear in results.
+Exit 2 identifies invalid arguments. Every failure also emits an actionable
+stderr diagnostic. Source values never appear in results or diagnostics.
 The source may be the destination file itself; failed validation preserves the
 previous configuration. Verification runs the installed CLI in dry-run mode.
 
