@@ -34,3 +34,6 @@ AWS_DEPLOYMENT.md
 
 # Runtime installer fixtures run in CI, not in the installed skill.
 skills/**/*.test.mjs
+
+# Private release-recovery staging is never plugin content.
+/.release-version-*/
