@@ -3,7 +3,7 @@
 ## 0.3.5 — 2026-10-23
 
 - Include named OOO changes and the prioritySet alias while preserving setToP2.
-- Preserve all-day trip dates across process timezones. Reconcile only active
+- Preserve all-day trip dates across process timezones. Resolve Reclaim and OOO expiration at home-local midnight with a UTC fallback. Reconcile only active
   overrides and OOO blocks, retaining the full JSON schedule. Create neighboring
   overrides sequentially and report priority-only changes.
 

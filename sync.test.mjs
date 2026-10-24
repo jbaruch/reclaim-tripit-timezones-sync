@@ -87,6 +87,40 @@ describe('CLI orchestration outcomes', () => {
   }
   beforeEach(setup);
 
+  /** @type {Array<[string, string, boolean]>} */
+  const reclaimMidnightCases = [
+    ['America/Chicago', '2024-06-10T04:59:00Z', true],
+    ['America/Chicago', '2024-06-10T05:00:00Z', false],
+    ['Europe/Brussels', '2024-06-09T21:59:00Z', true],
+    ['Europe/Brussels', '2024-06-09T22:00:00Z', false],
+    ['invalid-zone', '2024-06-10T00:00:00Z', false]
+  ];
+  for (const [zone, now, active] of reclaimMidnightCases) {
+    it(`reconciles Reclaim using home-local midnight at ${now} (${zone})`, async (t) => {
+      const f = fixture(t);
+      t.mock.timers.setTime(new Date(now).getTime());
+      const events = tripFeed([{ summary: 'Paris', start: '2024-06-08', end: '2024-06-10', geo: '48.8566;2.3522' }]);
+      assert.equal(
+        await main(['sync', '--output=json'], {
+          ...f.dependencies,
+          fetchIcalEvents: async () => events,
+          listEntries: async () => ({
+            entries: active
+              ? [{ id: 1, startDate: '2024-06-08', endDate: '2024-06-10', timezone: 'Europe/Paris' }]
+              : [],
+            defaultTimezone: zone
+          })
+        }),
+        0
+      );
+      assert.equal(f.read().noChanges, true);
+      assert.deepEqual(f.read().timezoneChanges, []);
+      assert.equal(f.read().segments.length, 1);
+      assert.equal(f.dependencies.clearAllEntries.mock.callCount(), 0);
+      assert.equal(f.dependencies.createEntry.mock.callCount(), 0);
+    });
+  }
+
   it('keeps an ending segment in JSON without rewriting the matching active Reclaim entries', async (t) => {
     const f = fixture(t);
     t.mock.timers.setTime(new Date('2024-06-10T12:00:00Z').getTime());

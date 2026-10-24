@@ -225,7 +225,8 @@ export async function main(argv = process.argv.slice(2), overrides = {}) {
       }
 
       const { kept: segments, dropped: homeDropped } = filterHomeTimezoneSegments(deduped, homeTz);
-      const reclaimSegments = filterReclaimSegments(segments, today);
+      const homeCalendarDate = oooDateAt(homeTz, referenceNow);
+      const reclaimSegments = filterReclaimSegments(segments, homeCalendarDate);
       if (homeDropped.length > 0) {
         console.log(`  Dropped ${homeDropped.length} redundant home-timezone segment(s) [${homeTz}]`);
       }
@@ -263,7 +264,7 @@ export async function main(argv = process.argv.slice(2), overrides = {}) {
       }));
 
       // Get future trips for OOO sync
-      const futureTrips = filterFutureTrips(trips, oooDateAt(homeTz, referenceNow));
+      const futureTrips = filterFutureTrips(trips, homeCalendarDate);
 
       // Google Calendar client (null when OOO not configured / not opted in).
       // In OneCLI mode the gateway injects Google auth; createGCalClient ignores
