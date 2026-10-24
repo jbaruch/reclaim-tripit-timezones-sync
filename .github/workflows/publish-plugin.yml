@@ -31,28 +31,15 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Detect plugin.json version change in this push
+      - name: Read the explicit plugin version
         id: vchange
-        # Only tag if the user actually bumped the plugin.json version in
-        # this push. Otherwise a missing tag is a manual fix-up situation,
-        # not something we should auto-create at the wrong commit.
         run: |
-          BEFORE="${{ github.event.before }}"
-          LOCAL_VERSION=$(jq -r '.version' .tessl-plugin/plugin.json)
+          LOCAL_VERSION=$(jq -er '.version' .tessl-plugin/plugin.json)
+          if [[ ! "$LOCAL_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo 'Repair plugin.json with a complete release version before publishing.' >&2
+            exit 1
+          fi
           echo "version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
-          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            echo "bumped=false" >> "$GITHUB_OUTPUT"
-            echo "First push or unknown before-ref; not tagging"
-            exit 0
-          fi
-          PREV_VERSION=$(git show "$BEFORE:.tessl-plugin/plugin.json" 2>/dev/null | jq -r '.version' 2>/dev/null || echo "")
-          if [ -n "$PREV_VERSION" ] && [ "$PREV_VERSION" != "$LOCAL_VERSION" ]; then
-            echo "bumped=true" >> "$GITHUB_OUTPUT"
-            echo "plugin.json version bumped: $PREV_VERSION → $LOCAL_VERSION"
-          else
-            echo "bumped=false" >> "$GITHUB_OUTPUT"
-            echo "plugin.json version unchanged ($LOCAL_VERSION)"
-          fi
 
       - name: Install Tessl CLI
         uses: tesslio/setup-tessl@25ec223fc0da33b41b8044ff5ab2b85235f4f91e # v2; Renovate renews GitHub Actions pins.
@@ -67,22 +54,25 @@ jobs:
         with:
           threshold: '85'
 
-      - name: Tag the bumped plugin.json version
-        # Runs only when this push actually bumped the version. The in-skill
-        # curl URL inside the bundle references vX.Y.Z, so tag this commit
-        # BEFORE the registry publish — consumers who fresh-install the new
-        # plugin must not 404 on the install URL. Use `git ls-remote` so the
-        # existence check doesn't depend on the local checkout having fetched
-        # tags.
-        if: steps.vchange.outputs.bumped == 'true'
+      - name: Ensure the reviewed source archive exists
+        # Review completes before any immutable artifact. A failed earlier
+        # review may have left this explicit version without its tag.
         run: |
           TAG="v${{ steps.vchange.outputs.version }}"
-          if [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
-            echo "Tag $TAG already exists on origin, no tag needed"
+          SOURCE=$(git rev-parse HEAD)
+          EXISTING=$(git ls-remote --tags origin "refs/tags/${TAG}")
+          if [ -n "$EXISTING" ]; then
+            git fetch --quiet --no-tags origin "refs/tags/${TAG}"
+            TAG_SOURCE=$(git rev-parse 'FETCH_HEAD^{commit}')
+            if [ "$TAG_SOURCE" != "$SOURCE" ]; then
+              echo "Tag $TAG belongs to another source. Bump the plugin and pinned installation URLs before retrying; existing tags are never moved." >&2
+              exit 1
+            fi
+            echo "Verified existing tag $TAG at the reviewed source"
           else
-            git tag "$TAG"
-            git push origin "$TAG"
-            echo "Created tag $TAG at this commit"
+            git tag "$TAG" "$SOURCE"
+            git push origin "refs/tags/$TAG"
+            echo "Created $TAG at the reviewed source"
           fi
 
       - name: Publish plugin to Tessl registry

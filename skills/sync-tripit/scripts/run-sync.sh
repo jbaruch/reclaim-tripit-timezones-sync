@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: bash run-sync.sh [installation-directory] (default $HOME/.tripit-reclaim).
-# Source the operator-owned .env when present, then run sync --output=json.
+# Parse dotenv as data; inherited environment values take precedence.
 # Stdout/exit status are the runtime's JSON/process contract; setup errors go to
 # stderr, exit 1 (missing install) or 2 (bad arguments). Never print credentials.
 set -euo pipefail
@@ -16,10 +16,10 @@ run_sync_main() (
     return 1
   fi
   if [[ -f "$install_dir/.env" ]]; then
-    set -a
-    # shellcheck disable=SC1091 # Operator-owned runtime configuration is not a source-tree dependency.
-    source "$install_dir/.env"
-    set +a
+    # Only an inherited Node option is authority to load code at startup.
+    # An empty inherited value prevents dotenv from introducing NODE_OPTIONS.
+    export NODE_OPTIONS="${NODE_OPTIONS-}"
+    exec node --env-file="$install_dir/.env" "$install_dir/sync.mjs" sync --output=json
   fi
   exec node "$install_dir/sync.mjs" sync --output=json
 )
