@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           # Keep this aligned with NanoClaw's node:24-slim agent image.
-          node-version: '24.22.0'
+          node-version: '24.22.3'
           cache: npm
       - run: npm ci
       - name: Format
